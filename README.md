@@ -5,6 +5,11 @@ relationship to Cloth is the same kind of boundary Cargo has with Rust: Shuttle
 owns projects and repeatable builds; the Cloth compiler owns the language and
 translation of explicit inputs into verified outputs.
 
+Shuttle is implemented in stable Rust 2024. It communicates with the C++ Cloth
+compiler through a versioned child-process protocol rather than C++ headers,
+FFI, or a shared-library ABI. Released Shuttle binaries do not require users to
+install Rust. See [Implementation language](docs/implementation_language.md).
+
 ## Responsibilities
 
 Shuttle will own:
@@ -24,19 +29,24 @@ the compiler through a versioned process-level build protocol.
 The Cloth compiler will not parse `Shuttle.toml`, resolve dependency versions,
 access registries, select build profiles, or apply workspace policy.
 
+## Contracts
+
+- [`Shuttle.toml` version 1](docs/manifest.md)
+- [Shuttle-to-`clothc` protocol version 1](docs/compiler_protocol.md)
+- [Implementation language](docs/implementation_language.md)
+
 ## Status
 
-Shuttle is pre-bootstrap. No implementation stage is active. The first
-scheduled work is the Stage 22 contract shared with the Cloth compiler:
+Shuttle is pre-bootstrap. Stage 22 is active; its 22.1 public contract is
+complete and no implementation code has started. The approved work shared with
+the Cloth compiler is:
 
-1. freeze the manifest schema and package/workspace terminology;
-2. freeze dependency namespace mapping and the build request;
-3. implement deterministic local dependency planning in Shuttle;
-4. add the compiler's explicit source-root and dependency interface; and
-5. verify the boundary with cross-repository projects.
+1. implement the approved manifest model and production CLI foundation;
+2. implement deterministic local dependency planning in Shuttle;
+3. add the compiler's explicit package graph interface; and
+4. verify the boundary with cross-repository projects.
 
-Until that contract is approved, the repository intentionally contains no
-manifest parser or build engine.
+Implementation begins only when Stage 22.2 receives its explicit go-ahead.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.
