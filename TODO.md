@@ -6,7 +6,7 @@ in owning contracts rather than only recorded as completed checkboxes.
 
 ## Active stage
 
-Stage 22 is active. Stages 22.1 and 22.2 are complete; Stage 22.3 has not
+Stage 22 is active. Stages 22.1 through 22.3 are complete; Stage 22.4 has not
 started.
 
 ## Scheduled work
@@ -21,7 +21,7 @@ started.
 - [x] **22.2 — Bootstrap.** Establish the production command-line application,
   manifest model and parser, validation boundaries, deterministic diagnostics,
   build configuration, formatting, and unit-test harness.
-- [ ] **22.3 — Local build graph.** Resolve local path dependencies, validate
+- [x] **22.3 — Local build graph.** Resolve local path dependencies, validate
   source roots and identities, reject cycles and duplicates, and produce the
   approved ordered compiler request without parsing Cloth source.
 - [ ] **22.4 — Cross-tool verification.** Exercise valid and invalid

@@ -49,11 +49,23 @@ cargo fmt --all -- --check
 Run `cargo run -- --help` to inspect the command surface while developing.
 Released builds use `cargo build --release --locked`.
 
+For a local Cloth project and compiler checkout:
+
+```sh
+cargo run --locked -- check --manifest-path ../examples/Shuttle.toml \
+  --compiler ../build/dev/clothc
+cargo run --locked -- run --manifest-path ../examples/Shuttle.toml \
+  --compiler ../build/dev/clothc
+```
+
+`check` emits no artifact. `build` and `run` place the native executable under
+the root package's `target/x86_64/` directory.
+
 ## Status
 
-Stage 22 is active. Its 22.1 public contract and 22.2 Rust bootstrap are
-complete; Stage 22.3 has not started. The approved work shared with the Cloth
-compiler is:
+Stage 22 is active. Stages 22.1 through 22.3 are complete; cross-tool fixture
+and exit verification remains in Stage 22.4. The approved work shared with the
+Cloth compiler is:
 
 1. implement the approved manifest model and production CLI foundation;
 2. implement deterministic local dependency planning in Shuttle;

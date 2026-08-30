@@ -6,7 +6,7 @@ use semver::Version;
 use serde::Deserialize;
 use toml::Spanned;
 
-use crate::diagnostic::{Diagnostic, sort_diagnostics};
+use crate::diagnostic::{Diagnostic, SourcePosition, position_for_offset, sort_diagnostics};
 
 pub const MANIFEST_FILENAME: &str = "Shuttle.toml";
 const LEGACY_MANIFEST_FILENAME: &str = "cloth.toml";
@@ -38,6 +38,7 @@ pub struct Executable {
 pub struct Dependency {
     pub alias: String,
     pub package_root: PathBuf,
+    pub declaration_position: SourcePosition,
 }
 
 #[derive(Debug, Deserialize)]
@@ -130,6 +131,27 @@ pub fn discover_manifest(start: &Path) -> Result<PathBuf, Diagnostic> {
         "could not find '{MANIFEST_FILENAME}' in '{}' or any parent directory",
         display_path(start)
     )))
+}
+
+/// Resolves the canonical manifest directly inside a package root.
+///
+/// # Errors
+///
+/// Returns a diagnostic when the root cannot be inspected or does not contain
+/// exactly one correctly cased `Shuttle.toml` without an obsolete manifest.
+pub fn manifest_in_package_root(package_root: &Path) -> Result<PathBuf, Diagnostic> {
+    match inspect_manifest_directory(package_root)? {
+        DirectoryManifest::Current(path) => Ok(path),
+        DirectoryManifest::Legacy(path) => Err(legacy_manifest_error(path)),
+        DirectoryManifest::CaseMismatch(path) => Err(Diagnostic::file(
+            path,
+            format!("manifest filename must be exactly '{MANIFEST_FILENAME}'"),
+        )),
+        DirectoryManifest::Missing => Err(Diagnostic::file(
+            package_root,
+            format!("dependency package root does not contain '{MANIFEST_FILENAME}'"),
+        )),
+    }
 }
 
 /// Parses and validates a manifest version 1 document.
@@ -474,6 +496,7 @@ fn validate_dependencies(
     let mut dependencies = BTreeMap::new();
     for (alias, raw_dependency) in raw_dependencies {
         let declaration_span = raw_dependency.span();
+        let declaration_position = position_for_offset(source, declaration_span.start);
         let raw_dependency = raw_dependency.into_inner();
         let mut valid = true;
         if !is_dependency_alias(&alias) {
@@ -511,6 +534,7 @@ fn validate_dependencies(
                 Dependency {
                     alias,
                     package_root: package_root.join(dependency_path),
+                    declaration_position,
                 },
             );
         }
