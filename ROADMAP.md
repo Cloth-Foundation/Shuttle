@@ -12,25 +12,27 @@ and `complete` in that order. Activation requires written scope, non-goals, exit
 criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
-Shuttle is currently **pre-bootstrap**. Its identity and ownership boundary are
-defined, but no implementation stage is active.
+Shuttle is currently **pre-bootstrap**. Stage 22.1 is complete; Stage 22.2
+implementation has not started.
 
 ## Stage 22: Local projects and compiler build protocol
 
-Status: **planned**
+Status: **active**
 
 Objective: bootstrap Shuttle around a deterministic local-project contract and
 invoke `clothc` without transferring build-system policy into the compiler.
 
-Prerequisites: Cloth compiler Stage 21 and approval of the shared Stage 22.1
-manifest and build-protocol contract.
+Prerequisites: Cloth compiler Stage 21 and the approved Shuttle/compiler
+ownership boundary.
 
 Deliverables:
 
-1. Parse and validate the approved versioned `Shuttle.toml` schema.
-2. Resolve the ordered local dependency graph and diagnose invalid manifests,
-   roots, identities, paths, duplicates, and cycles before compiler invocation.
-3. Construct and invoke the approved versioned compiler build request without
+1. Freeze the implementation-language policy, versioned `Shuttle.toml` schema,
+   and Shuttle-to-compiler build protocol.
+2. Parse and validate the approved manifest, then resolve the ordered local
+   dependency graph and diagnose invalid manifests, roots, identities, paths,
+   duplicates, and cycles before compiler invocation.
+3. Construct and invoke the approved compiler build request without
    depending on compiler implementation details.
 4. Verify deterministic behavior with Shuttle unit tests and cross-repository
    projects covering direct and dependency builds.
