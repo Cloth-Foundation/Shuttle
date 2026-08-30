@@ -231,6 +231,13 @@ All accept `--manifest-path`, `--compiler`, and `--target`. The Stage 22 target
 names are `x86_64` and `wasm32`; executable emission remains limited to the
 compiler's supported native target. `build` and `run` require `[executable]`.
 
+`--compiler` takes precedence over a `clothc` binary beside Shuttle and then a
+`clothc` found on `PATH`. Shuttle verifies protocol compatibility before every
+compiler invocation. Native output is written to
+`target/x86_64/EXECUTABLE_NAME` beneath the root package, with the platform
+executable suffix where required. `run` executes that completed output without
+passing source-visible arguments.
+
 Stage 22 does not provide `new`, `init`, `test`, `clean`, workspaces, profiles,
 features, publishing, or program-argument delivery. Those commands and concepts
 require later scheduled contracts.

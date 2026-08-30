@@ -1,10 +1,11 @@
-use std::fmt;
 use std::path::{Path, PathBuf};
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 
+use crate::compiler::{ProjectCommand, Target, build_request, execute_request, select_compiler};
 use crate::diagnostic::Diagnostic;
-use crate::manifest::{load_manifest, resolve_manifest_path};
+use crate::graph::resolve_package_graph;
+use crate::manifest::resolve_manifest_path;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -42,41 +43,23 @@ struct ProjectOptions {
     target: Target,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-enum Target {
-    #[value(name = "x86_64")]
-    X86_64,
-    #[value(name = "wasm32")]
-    Wasm32,
-}
-
-impl fmt::Display for Target {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::X86_64 => formatter.write_str("x86_64"),
-            Self::Wasm32 => formatter.write_str("wasm32"),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct CommandFailure {
     pub exit_code: u8,
     pub diagnostics: Vec<Diagnostic>,
 }
 
-/// Resolves and validates the selected project command.
+/// Resolves, validates, and executes the selected project command.
 ///
 /// # Errors
 ///
-/// Returns project diagnostics when manifest discovery or validation fails.
-/// Valid Stage 22 commands currently stop at the Stage 22.3 integration
-/// boundary with exit status 2.
+/// Returns project diagnostics when discovery, graph validation, compiler
+/// selection, protocol negotiation, compilation, or program execution fails.
 pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure> {
-    let (command_name, options) = match cli.command {
-        Command::Check(options) => ("check", options),
-        Command::Build(options) => ("build", options),
-        Command::Run(options) => ("run", options),
+    let (project_command, options) = match cli.command {
+        Command::Check(options) => (ProjectCommand::Check, options),
+        Command::Build(options) => (ProjectCommand::Build, options),
+        Command::Run(options) => (ProjectCommand::Run, options),
     };
 
     let manifest_path = resolve_manifest_path(options.manifest_path.as_deref(), current_directory)
@@ -84,24 +67,29 @@ pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure>
             exit_code: 1,
             diagnostics: vec![diagnostic],
         })?;
-    let manifest = load_manifest(&manifest_path).map_err(|diagnostics| CommandFailure {
+    let graph = resolve_package_graph(&manifest_path).map_err(|diagnostics| CommandFailure {
         exit_code: 1,
         diagnostics,
     })?;
-
-    let compiler_context = options.compiler.as_ref().map_or_else(
-        || "the default compiler".to_owned(),
-        |path| format!("compiler '{}'", display_path(path)),
-    );
-    Err(CommandFailure {
-        exit_code: 2,
-        diagnostics: vec![Diagnostic::global(format!(
-            "command '{command_name}' for package '{}' and target '{}' is unavailable until Stage 22.3 ({compiler_context})",
-            manifest.package.name, options.target
-        ))],
+    let request = build_request(&graph, project_command, options.target).map_err(|diagnostic| {
+        CommandFailure {
+            exit_code: 1,
+            diagnostics: vec![diagnostic],
+        }
+    })?;
+    let compiler =
+        select_compiler(options.compiler.as_deref(), current_directory).map_err(|diagnostic| {
+            CommandFailure {
+                exit_code: 2,
+                diagnostics: vec![diagnostic],
+            }
+        })?;
+    execute_request(&compiler, &request).map_err(|failure| CommandFailure {
+        exit_code: failure.exit_code,
+        diagnostics: failure
+            .message
+            .map(Diagnostic::global)
+            .into_iter()
+            .collect(),
     })
-}
-
-fn display_path(path: &Path) -> String {
-    path.to_string_lossy().replace('\\', "/")
 }

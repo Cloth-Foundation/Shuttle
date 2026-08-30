@@ -56,7 +56,7 @@ version = "0.1.0"
 }
 
 #[test]
-fn valid_manifest_reaches_the_deliberate_stage_boundary() {
+fn native_build_rejects_an_unsupported_target_before_compiler_selection() {
     let project = project(
         r#"manifest-version = 1
 
@@ -73,13 +73,10 @@ entry = "Main.co"
         &["build", "--target", "wasm32", "--compiler", "tools/clothc"],
     );
 
-    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8(output.stderr).expect("UTF-8 standard error");
-    assert!(stderr.contains("package 'hello-world'"));
-    assert!(stderr.contains("target 'wasm32'"));
-    assert!(stderr.contains("unavailable until Stage 22.3"));
-    assert!(stderr.contains("tools/clothc"));
+    assert!(stderr.contains("native executable output currently supports only target 'x86_64'"));
 }
 
 #[test]
@@ -94,11 +91,21 @@ version = "0.1.0"
     );
     let nested = project.path().join("nested");
     fs::create_dir(&nested).expect("create nested directory");
-    let output = shuttle(&nested, &["check", "--manifest-path", "../Shuttle.toml"]);
+    let output = shuttle(
+        &nested,
+        &[
+            "check",
+            "--manifest-path",
+            "../Shuttle.toml",
+            "--compiler",
+            "missing-clothc",
+        ],
+    );
 
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).expect("UTF-8 standard error");
-    assert!(stderr.contains("package 'hello'"));
+    assert!(stderr.contains("invalid compiler"));
+    assert!(stderr.contains("missing-clothc"));
 }
 
 #[test]

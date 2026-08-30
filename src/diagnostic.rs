@@ -69,6 +69,19 @@ impl Diagnostic {
     }
 
     #[must_use]
+    pub fn at_position(
+        path: impl Into<PathBuf>,
+        position: SourcePosition,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            path: Some(path.into()),
+            position: Some(position),
+            message: message.into(),
+        }
+    }
+
+    #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }
