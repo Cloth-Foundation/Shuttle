@@ -1,7 +1,6 @@
 # Shuttle
 
-Shuttle is Cloth's official project, build, and package manager. Its
-relationship to Cloth is the same kind of boundary Cargo has with Rust: Shuttle
+Shuttle is Cloth's official project, build, and package manager. Shuttle
 owns projects and repeatable builds; the Cloth compiler owns the language and
 translation of explicit inputs into verified outputs.
 
