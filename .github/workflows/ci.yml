@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality:
+    name: Quality (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
+      - name: Check formatting
+        if: runner.os == 'Linux'
+        run: cargo +stable fmt --all -- --check
+      - name: Run Clippy
+        run: cargo +stable clippy --all-targets --locked -- -D warnings
+      - name: Run tests
+        run: cargo +stable test --all-targets --locked
+
+  msrv:
+    name: Rust 1.85
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install minimum supported Rust
+        run: rustup toolchain install 1.85.0 --profile minimal
+      - name: Check minimum supported Rust
+        run: cargo +1.85.0 check --all-targets --locked

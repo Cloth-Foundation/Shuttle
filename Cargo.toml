@@ -1,0 +1,24 @@
+[package]
+name = "shuttle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Cloth's project, build, and package manager"
+publish = false
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+semver = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+# Manifest version 1 is pinned to TOML 1.0.0. Later 0.9 releases parse TOML 1.1.
+toml = { version = "=0.9.9", default-features = false, features = ["parse", "serde", "std"] }
+
+[dev-dependencies]
+tempfile = "3.20"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }

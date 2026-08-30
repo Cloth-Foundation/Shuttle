@@ -35,18 +35,31 @@ access registries, select build profiles, or apply workspace policy.
 - [Shuttle-to-`clothc` protocol version 1](docs/compiler_protocol.md)
 - [Implementation language](docs/implementation_language.md)
 
+## Build and test
+
+Shuttle requires stable Rust with Cargo. The minimum supported Rust version is
+1.85.0.
+
+```sh
+cargo build --locked
+cargo test --all-targets --locked
+cargo clippy --all-targets --locked -- -D warnings
+cargo fmt --all -- --check
+```
+
+Run `cargo run -- --help` to inspect the command surface while developing.
+Released builds use `cargo build --release --locked`.
+
 ## Status
 
-Shuttle is pre-bootstrap. Stage 22 is active; its 22.1 public contract is
-complete and no implementation code has started. The approved work shared with
-the Cloth compiler is:
+Stage 22 is active. Its 22.1 public contract and 22.2 Rust bootstrap are
+complete; Stage 22.3 has not started. The approved work shared with the Cloth
+compiler is:
 
 1. implement the approved manifest model and production CLI foundation;
 2. implement deterministic local dependency planning in Shuttle;
 3. add the compiler's explicit package graph interface; and
 4. verify the boundary with cross-repository projects.
-
-Implementation begins only when Stage 22.2 receives its explicit go-ahead.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.
