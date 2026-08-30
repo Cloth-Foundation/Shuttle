@@ -12,8 +12,8 @@ and `complete` in that order. Activation requires written scope, non-goals, exit
 criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
-Shuttle is currently **pre-bootstrap**. Stage 22.1 is complete; Stage 22.2
-implementation has not started.
+Shuttle's bootstrap is complete. Stages 22.1 and 22.2 are complete; Stage 22.3
+has not started.
 
 ## Stage 22: Local projects and compiler build protocol
 

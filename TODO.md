@@ -6,8 +6,8 @@ in owning contracts rather than only recorded as completed checkboxes.
 
 ## Active stage
 
-Stage 22 is active. Stage 22.1 is complete; Stage 22.2 implementation must not
-begin until it receives an explicit go-ahead.
+Stage 22 is active. Stages 22.1 and 22.2 are complete; Stage 22.3 has not
+started.
 
 ## Scheduled work
 
@@ -18,7 +18,7 @@ begin until it receives an explicit go-ahead.
   mapping, schema and protocol versioning, compiler request inputs, migration
   behavior, and diagnostics ownership with the Cloth compiler. The approved
   contracts are in `docs/`.
-- [ ] **22.2 — Bootstrap.** Establish the production command-line application,
+- [x] **22.2 — Bootstrap.** Establish the production command-line application,
   manifest model and parser, validation boundaries, deterministic diagnostics,
   build configuration, formatting, and unit-test harness.
 - [ ] **22.3 — Local build graph.** Resolve local path dependencies, validate
