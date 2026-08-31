@@ -13,7 +13,7 @@ criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
 Stage 22 is complete, including the shared process, native, and sanitizer
-verification. Stage 23 remains planned.
+verification. Stage 23 is active under the approved shared contract.
 
 ## Stage 22: Local projects and compiler build protocol
 
@@ -60,7 +60,12 @@ the coordinated exit audit.
 
 ## Stage 23: Separate compilation and deterministic linking
 
-Status: **planned**
+Status: **active**
+
+The [process-v2 proposal](docs/proposals/compiler_protocol_v2.md) and its linked
+compiler artifact proposal were approved with implementation authorization on
+2026-08-31. Compiler identity/artifact foundations precede Shuttle's process-v2
+integration; approval does not claim those operations already exist.
 
 Objective: orchestrate independent local-package compilation and deterministic
 linking through the compiler-owned, versioned artifact contract.
@@ -69,22 +74,25 @@ Prerequisite: Stage 22.
 
 Deliverables:
 
-1. Consume and validate the compiler's versioned package-artifact metadata.
-2. Build dependencies in deterministic topological order and reuse compatible
-   local artifacts.
+1. Consume and validate public compiler artifact receipts without parsing
+   semantic/ABI metadata or native objects.
+2. Build dependencies in deterministic topological order and share each
+   compatible artifact across consumers within that invocation. Automatic
+   reuse across commands remains deferred.
 3. Invoke deterministic linking and report package context for compiler or
    linker failures without changing their meaning.
 4. Verify equivalence with the compiler's whole-project pipeline.
 
 Non-goals:
 
-- remote caches, distributed builds, registries, dynamic loading, or ABI
-  stability across Cloth releases;
+- automatic incremental caching, remote caches, distributed builds,
+  registries, dynamic loading, or ABI stability across Cloth releases;
 - optimization policy beyond forwarding approved build-profile inputs.
 
 Exit criteria:
 
 - every Stage 23 item in `TODO.md` is complete;
 - incompatible, missing, or duplicate artifacts fail deterministically;
-- clean and reusable local builds produce equivalent programs; and
+- independently compiled and reused artifacts produce programs equivalent to
+  whole-project compilation, without a source-freshness/cache claim; and
 - shared compiler integration and Shuttle verification suites pass.
