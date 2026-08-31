@@ -1,0 +1,2 @@
+static func Value(): int32 { return 20; }
+static func Main(): int32 { return 98; }

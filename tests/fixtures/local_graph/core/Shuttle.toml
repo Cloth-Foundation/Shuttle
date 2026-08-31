@@ -1,0 +1,8 @@
+manifest-version = 1
+
+[package]
+name = "foundation"
+version = "1.0.0"
+
+[executable]
+entry = "data/Record.co"

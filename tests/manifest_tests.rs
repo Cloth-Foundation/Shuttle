@@ -199,3 +199,71 @@ fn reports_case_mismatched_manifest_names() {
             .contains("must be exactly 'Shuttle.toml'")
     );
 }
+
+#[test]
+fn rejects_missing_wrong_typed_and_future_schema_fields() {
+    for manifest in [
+        "[package]\nname = \"app\"\nversion = \"0.1.0\"\n",
+        "manifest-version = true\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n",
+        "manifest-version = 1\n[package]\nname = \"app\"\nversion = 1\n",
+        "manifest-version = 1\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n[workspace]\n",
+        "manifest-version = 1\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n[dependencies]\nmodels = \"../models\"\n",
+    ] {
+        let project = valid_project(manifest);
+        assert!(
+            load_manifest(&project.path().join(MANIFEST_FILENAME)).is_err(),
+            "{manifest}"
+        );
+    }
+}
+
+#[test]
+fn rejects_nonportable_roots_and_entries_before_io_normalizes_them() {
+    for root in [
+        "src/./nested",
+        "src//nested",
+        "../src",
+        "src/",
+        "",
+        "C:/src",
+    ] {
+        let manifest = format!(
+            "manifest-version = 1\n[package]\nname = \"app\"\nversion = \"0.1.0\"\nsource-root = \"{root}\"\n"
+        );
+        let project = valid_project(&manifest);
+        fs::create_dir_all(project.path().join("src/nested")).expect("nested source directory");
+        assert!(
+            load_manifest(&project.path().join(MANIFEST_FILENAME)).is_err(),
+            "accepted {root}"
+        );
+    }
+    for entry in ["./Main.co", "nested/../Main.co", "Main.CO", "Missing.co"] {
+        let manifest = format!(
+            "manifest-version = 1\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n[executable]\nentry = \"{entry}\"\n"
+        );
+        let project = valid_project(&manifest);
+        assert!(
+            load_manifest(&project.path().join(MANIFEST_FILENAME)).is_err(),
+            "accepted {entry}"
+        );
+    }
+}
+
+#[test]
+fn rejects_coexisting_old_and_new_manifests_even_with_an_explicit_path() {
+    let project =
+        valid_project("manifest-version = 1\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n");
+    write_file(&project.path().join("cloth.toml"), "");
+    assert!(discover_manifest(project.path()).is_err());
+    assert!(load_manifest(&project.path().join(MANIFEST_FILENAME)).is_err());
+}
+
+#[test]
+fn rejects_non_utf8_manifests() {
+    let project = valid_project("");
+    fs::write(project.path().join(MANIFEST_FILENAME), [0xff, 0xfe])
+        .expect("invalid UTF-8 manifest");
+    let errors =
+        load_manifest(&project.path().join(MANIFEST_FILENAME)).expect_err("UTF-8 rejection");
+    assert!(errors[0].message().contains("not valid UTF-8"));
+}

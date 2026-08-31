@@ -675,6 +675,10 @@ fn validate_relative_path(value: &str, allow_parent: bool) -> Result<(), &'stati
     if value.chars().any(char::is_control) {
         return Err("path must not contain control characters");
     }
+    // Path::components normalizes interior '.' components before validation.
+    if value.split('/').any(|component| component == ".") {
+        return Err("path must not contain '.' components");
+    }
     let path = Path::new(value);
     if path.is_absolute() {
         return Err("path must be relative");

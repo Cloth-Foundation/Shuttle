@@ -83,6 +83,9 @@ manifest has no executable. When present, the compiler selects the eligible
 public static `Main` from that exact file. A `Main` in a dependency or another
 root-package file is not a competing native entry point.
 
+When an entry is supplied, `check` also validates that file's `Main` signature
+without emitting code. Entry eligibility is shared with executable emission.
+
 The compiler rejects an empty package source root, invalid Cloth path
 components, duplicate logical identities, a source escaping its supplied root,
 and dependency aliases that collide with a local top-level source package.
@@ -99,9 +102,11 @@ Protocol version 1 accepts the target names `x86_64` and `wasm32`.
 
 Protocol mode never prints token, AST, HIR, MIR, or ABI debug dumps. Parent
 directories for an output must already exist; Shuttle owns output-directory
-creation and policy. The compiler writes through a temporary sibling and
-replaces the requested output only after successful generation, so a failed
-build does not leave a partial artifact.
+creation and policy. The compiler writes into an exclusively created private
+temporary directory beside the output and replaces the requested file only
+after successful generation. Failed generation or replacement preserves the
+previous output; it does not remove a directory or reuse an unrelated `.tmp`
+neighbor. Temporary artifacts owned by the invocation are cleaned up.
 
 ## Paths and encoding
 
@@ -162,6 +167,10 @@ The current working directory is not a project input in protocol mode. All
 project and output paths are explicit and absolute. Locale, terminal color,
 wall-clock time, and unrelated environment variables must not affect compiled
 program bytes or diagnostic ordering.
+
+Windows native linking disables wall-clock PE timestamps. Native tools receive
+private ASCII artifact names relative to an OS-native working directory, so a
+legacy narrow-argument linker does not corrupt Unicode project/output paths.
 
 Compiler discovery is Shuttle policy, but the chosen compiler path is fixed for
 one command. Protocol version, manifest version, package version, compiler ABI,

@@ -37,6 +37,7 @@ impl fmt::Display for Target {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CompilerRequest {
+    root_package: String,
     arguments: Vec<OsString>,
     output_path: Option<PathBuf>,
     run_after_build: bool,
@@ -146,6 +147,7 @@ pub fn build_request(
     }
 
     Ok(CompilerRequest {
+        root_package: graph.root_package.clone(),
         arguments,
         output_path,
         run_after_build: command == ProjectCommand::Run,
@@ -229,7 +231,15 @@ pub fn execute_request(compiler: &Path, request: &CompilerRequest) -> Result<(),
             ))
         })?;
     if !status.success() {
-        return Err(compiler_status_failure(status.code()));
+        let mut failure = compiler_status_failure(status.code());
+        if let Some(message) = &mut failure.message {
+            *message = format!(
+                "package '{}', compiler '{}': {message}",
+                request.root_package,
+                display_path(compiler)
+            );
+        }
+        return Err(failure);
     }
 
     if request.run_after_build {
