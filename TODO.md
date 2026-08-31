@@ -6,9 +6,11 @@ in owning contracts rather than only recorded as completed checkboxes.
 
 ## Active stage
 
-Stage 22 is complete. No stage is active; Stage 23 remains planned and requires
-the shared artifact contract before implementation. Shared verification is
-documented in `docs/testing.md`.
+Stage 22 is complete. Stage 23 is active; the
+[process-v2 proposal](docs/proposals/compiler_protocol_v2.md) and its companion
+compiler artifact proposal were approved with implementation authorization on
+2026-08-31. Compiler identity/artifact foundations precede process integration.
+Shared verification is documented in `docs/testing.md`.
 
 ## Scheduled work
 
@@ -31,10 +33,14 @@ documented in `docs/testing.md`.
 
 ### Stage 23: Separate compilation and deterministic linking
 
-- [ ] **23.1 — Artifact consumption.** Read and validate the compiler-owned
-  artifact metadata without depending on private compiler representations.
+- [x] **23.1 — Shared artifact contract.** Approve the compiler artifact and
+  [process-v2 proposals](docs/proposals/compiler_protocol_v2.md), including
+  public receipts, exact compatibility, check-only artifacts, output ownership,
+  and the boundary between artifact reuse and deferred automatic caching.
 - [ ] **23.2 — Ordered compilation.** Compile local dependency packages in a
-  deterministic topological order and reuse only compatible artifacts.
+  deterministic topological order, consume and validate public compiler receipts,
+  and reuse each compatible artifact across consumers within one invocation
+  without depending on private compiler representations.
 - [ ] **23.3 — Link orchestration.** Invoke the approved link pipeline and add
   package context while preserving compiler and linker diagnostics.
 - [ ] **23.4 — Equivalence verification.** Prove clean and reused builds match
