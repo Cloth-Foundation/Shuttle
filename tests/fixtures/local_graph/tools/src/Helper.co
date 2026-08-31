@@ -1,0 +1,3 @@
+import base.data::Record;
+
+static func Value(): int32 { return Record.Value(); }

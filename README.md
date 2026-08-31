@@ -49,6 +49,10 @@ cargo fmt --all -- --check
 Run `cargo run -- --help` to inspect the command surface while developing.
 Released builds use `cargo build --release --locked`.
 
+Real-compiler and native tests are opt-in for standalone Cargo runs and are
+enabled by Cloth's development/sanitizer CTest presets. See
+[Testing](docs/testing.md) for the shared fixture and standalone commands.
+
 For a local Cloth project and compiler checkout:
 
 ```sh
@@ -63,14 +67,10 @@ the root package's `target/x86_64/` directory.
 
 ## Status
 
-Stage 22 is active. Stages 22.1 through 22.3 are complete; cross-tool fixture
-and exit verification remains in Stage 22.4. The approved work shared with the
-Cloth compiler is:
-
-1. implement the approved manifest model and production CLI foundation;
-2. implement deterministic local dependency planning in Shuttle;
-3. add the compiler's explicit package graph interface; and
-4. verify the boundary with cross-repository projects.
+Local projects, recursive local dependencies, and `check`, `build`, and `run`
+are supported through compiler protocol version 1. The shared test suite
+verifies this boundary against both development and sanitizer compiler builds.
+Remote dependency retrieval and separate package artifacts are not implemented.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.

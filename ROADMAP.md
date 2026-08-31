@@ -12,12 +12,12 @@ and `complete` in that order. Activation requires written scope, non-goals, exit
 criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
-Shuttle's bootstrap and local build graph are complete. Stages 22.1 through
-22.3 are complete; Stage 22.4 has not started.
+Stage 22 is complete, including the shared process, native, and sanitizer
+verification. Stage 23 remains planned.
 
 ## Stage 22: Local projects and compiler build protocol
 
-Status: **active**
+Status: **complete**
 
 Objective: bootstrap Shuttle around a deterministic local-project contract and
 invoke `clothc` without transferring build-system policy into the compiler.
@@ -53,6 +53,10 @@ Exit criteria:
 - Shuttle never parses Cloth source or consumes private compiler structures;
 - local dependency projects pass the shared compiler integration suite; and
 - Shuttle's development and applicable sanitizer suites pass.
+
+The repeatable standalone and shared commands are in
+[`docs/testing.md`](docs/testing.md). The compiler's `docs/testing.md` records
+the coordinated exit audit.
 
 ## Stage 23: Separate compilation and deterministic linking
 

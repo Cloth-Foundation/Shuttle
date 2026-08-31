@@ -155,3 +155,88 @@ fn constructs_the_canonical_compiler_argument_order() {
         .expect("dependency arguments");
     assert_eq!(&dependency[1..], ["app", "models", "models"]);
 }
+
+#[test]
+fn a_diamond_resolves_a_shared_dependency_once_and_keeps_owner_aliases() {
+    let workspace = TempDir::new().expect("temporary graph");
+    let app = workspace.path().join("app");
+    write_package(
+        &app,
+        "app",
+        &[("right", "../right"), ("left", "../left")],
+        true,
+    );
+    write_package(
+        &workspace.path().join("left"),
+        "left",
+        &[("one", "../shared")],
+        false,
+    );
+    write_package(
+        &workspace.path().join("right"),
+        "right",
+        &[("two", "../shared")],
+        false,
+    );
+    write_package(&workspace.path().join("shared"), "shared", &[], true);
+    let graph = resolve_package_graph(&app.join("Shuttle.toml")).expect("diamond graph");
+    assert_eq!(graph.packages.len(), 4);
+    assert_eq!(graph.dependencies.len(), 4);
+    let request =
+        build_request(&graph, ProjectCommand::Build, Target::X86_64).expect("native request");
+    assert!(
+        request
+            .output_path()
+            .expect("output path")
+            .ends_with(format!("target/x86_64/app{}", std::env::consts::EXE_SUFFIX))
+    );
+    let before = request.arguments().to_vec();
+    write_package(
+        &app,
+        "app",
+        &[("left", "../left"), ("right", "../right")],
+        true,
+    );
+    let graph = resolve_package_graph(&app.join("Shuttle.toml")).expect("reordered graph");
+    assert_eq!(
+        build_request(&graph, ProjectCommand::Build, Target::X86_64)
+            .expect("reordered request")
+            .arguments(),
+        before
+    );
+}
+
+#[test]
+fn a_dependency_executable_does_not_supply_the_root_executable() {
+    let workspace = TempDir::new().expect("temporary graph");
+    let app = workspace.path().join("app");
+    write_package(&app, "app", &[("models", "../models")], false);
+    write_package(&workspace.path().join("models"), "models", &[], true);
+    let graph = resolve_package_graph(&app.join("Shuttle.toml")).expect("library graph");
+    let check =
+        build_request(&graph, ProjectCommand::Check, Target::Wasm32).expect("library check");
+    assert!(check.output_path().is_none());
+    assert!(!check.arguments().iter().any(|arg| arg == "--entry"));
+    for command in [ProjectCommand::Build, ProjectCommand::Run] {
+        assert!(build_request(&graph, command, Target::X86_64).is_err());
+    }
+}
+
+#[test]
+fn reports_independent_missing_dependencies_in_source_order() {
+    let workspace = TempDir::new().expect("temporary graph");
+    let app = workspace.path().join("app");
+    write_package(
+        &app,
+        "app",
+        &[("zebra", "../zebra"), ("alpha", "../alpha")],
+        false,
+    );
+    let errors =
+        resolve_package_graph(&app.join("Shuttle.toml")).expect_err("missing dependencies");
+    assert_eq!(errors.len(), 2);
+    assert!(
+        errors[0].position().expect("first position").line
+            < errors[1].position().expect("second position").line
+    );
+}
