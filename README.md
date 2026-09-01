@@ -32,6 +32,8 @@ access registries, select build profiles, or apply workspace policy.
 
 - [`Shuttle.toml` version 1](docs/manifest.md)
 - [Shuttle-to-`clothc` protocol version 1](docs/compiler_protocol.md)
+- [Shuttle-to-`clothc` protocol version 2](docs/proposals/compiler_protocol_v2.md)
+- [Cloth package artifact contract](../docs/proposals/stage_23_artifacts.md)
 - [Implementation language](docs/implementation_language.md)
 
 ## Build and test
@@ -62,15 +64,18 @@ cargo run --locked -- run --manifest-path ../examples/Shuttle.toml \
   --compiler ../build/dev/clothc
 ```
 
-`check` emits no artifact. `build` and `run` place the native executable under
-the root package's `target/x86_64/` directory.
+`check` uses temporary interface artifacts and leaves no build output. `build`
+and `run` place independently compiled package artifacts under
+`target/x86_64/packages/` and the native executable under
+`target/x86_64/` in the root package.
 
 ## Status
 
 Local projects, recursive local dependencies, and `check`, `build`, and `run`
-are supported through compiler protocol version 1. The shared test suite
-verifies this boundary against both development and sanitizer compiler builds.
-Remote dependency retrieval and separate package artifacts are not implemented.
+use compiler protocol version 2 for deterministic separate compilation and
+linking. Protocol version 1 remains available to older clients and explicit
+compiler tests. Automatic artifact reuse across commands, remote dependencies,
+and registries are not implemented.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.

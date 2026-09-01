@@ -1,10 +1,21 @@
+// Part of the Cloth Compiler project, under the Apache License v2.0 with LLVM
+// Exceptions. See LICENSE.txt in the project root for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fmt;
-use std::fs;
+use std::fs::{self, File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::ValueEnum;
+use fs2::FileExt;
+use serde::Deserialize;
 
 use crate::diagnostic::Diagnostic;
 use crate::graph::PackageGraph;
@@ -72,6 +83,7 @@ pub fn build_request(
     command: ProjectCommand,
     target: Target,
 ) -> Result<CompilerRequest, Diagnostic> {
+    validate_project_command(graph, command, target)?;
     let output_kind = match command {
         ProjectCommand::Check => "check",
         ProjectCommand::Build | ProjectCommand::Run => "executable",
@@ -152,6 +164,782 @@ pub fn build_request(
         output_path,
         run_after_build: command == ProjectCommand::Run,
     })
+}
+
+/// Validates target-independent command requirements before compiler selection.
+///
+/// # Errors
+///
+/// Returns a diagnostic when a build lacks an executable or selects an
+/// unsupported native target.
+pub fn validate_project_command(
+    graph: &PackageGraph,
+    command: ProjectCommand,
+    target: Target,
+) -> Result<(), Diagnostic> {
+    if command != ProjectCommand::Check && graph.root_executable.is_none() {
+        return Err(Diagnostic::global(format!(
+            "package '{}' has no [executable] target",
+            graph.root_package
+        )));
+    }
+    if command != ProjectCommand::Check && target != Target::X86_64 {
+        return Err(Diagnostic::global(
+            "native executable output currently supports only target 'x86_64'",
+        ));
+    }
+    Ok(())
+}
+
+const PROTOCOL_V2: &str = "2";
+const ARTIFACT_FORMAT: u32 = 1;
+const CAPABILITY_LIMIT: usize = 64 * 1024;
+const RECEIPT_LIMIT: usize = 16 * 1024 * 1024;
+
+#[derive(Debug, Deserialize)]
+struct Capabilities {
+    schema: u32,
+    protocols: Vec<u32>,
+    artifact_formats: Vec<u32>,
+    compiler_id: String,
+    operations: Vec<String>,
+    interface_targets: Vec<String>,
+    object_targets: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct ReceiptPackage {
+    name: String,
+    version: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct ReceiptDependency {
+    alias: String,
+    package: ReceiptPackage,
+    artifact_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct ArtifactReceipt {
+    schema: u32,
+    artifact_format: u32,
+    artifact_id: String,
+    kind: String,
+    package: ReceiptPackage,
+    target: String,
+    compiler_id: String,
+    dependencies: Vec<ReceiptDependency>,
+}
+
+#[derive(Clone, Debug)]
+struct ProducedArtifact {
+    path: PathBuf,
+    receipt: ArtifactReceipt,
+}
+
+struct CapturedProcess {
+    status: std::process::ExitStatus,
+    stdout: Vec<u8>,
+    stdout_oversized: bool,
+    stderr_nonempty: bool,
+}
+
+struct TemporaryBuildDirectory {
+    path: PathBuf,
+}
+
+impl TemporaryBuildDirectory {
+    fn create() -> Result<Self, ProcessFailure> {
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |duration| duration.as_nanos());
+        for _ in 0..16 {
+            let name = format!(
+                "cloth-shuttle-{}-{timestamp}-{}",
+                std::process::id(),
+                SEQUENCE.fetch_add(1, Ordering::Relaxed)
+            );
+            let path = std::env::temp_dir().join(name);
+            match fs::create_dir(&path) {
+                Ok(()) => return Ok(Self { path }),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(error) => {
+                    return Err(process_error(format!(
+                        "could not create private check directory '{}': {error}",
+                        display_path(&path)
+                    )));
+                }
+            }
+        }
+        Err(process_error(
+            "could not allocate a private check directory".to_owned(),
+        ))
+    }
+}
+
+impl Drop for TemporaryBuildDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+struct BuildLock {
+    file: File,
+}
+
+impl BuildLock {
+    fn acquire(directory: &Path) -> Result<Self, ProcessFailure> {
+        fs::create_dir_all(directory).map_err(|error| {
+            process_error(format!(
+                "could not create target directory '{}': {error}",
+                display_path(directory)
+            ))
+        })?;
+        let path = directory.join(".shuttle.lock");
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(|error| {
+                process_error(format!(
+                    "could not open build lock '{}': {error}",
+                    display_path(&path)
+                ))
+            })?;
+        file.try_lock_exclusive().map_err(|error| {
+            process_error(format!(
+                "another Shuttle build owns '{}': {error}",
+                display_path(directory)
+            ))
+        })?;
+        Ok(Self { file })
+    }
+}
+
+impl Drop for BuildLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
+struct BuildWorkspace {
+    artifact_directory: PathBuf,
+    _temporary: Option<TemporaryBuildDirectory>,
+    _lock: Option<BuildLock>,
+}
+
+/// Executes protocol-v2 separate package compilation and linking.
+///
+/// # Errors
+///
+/// Returns a process failure for capability, compiler, receipt, filesystem,
+/// locking, linking, or launched-program failures.
+pub fn execute_graph(
+    compiler: &Path,
+    graph: &PackageGraph,
+    command: ProjectCommand,
+    target: Target,
+) -> Result<(), ProcessFailure> {
+    if command != ProjectCommand::Check && target != Target::X86_64 {
+        return Err(process_error(
+            "native executable output currently supports only target 'x86_64'".to_owned(),
+        ));
+    }
+    let capabilities = query_capabilities(compiler)?;
+    validate_capabilities(&capabilities, target, command)?;
+    let order = topological_order(graph)?;
+    let workspace = create_build_workspace(graph, command, target)?;
+    let artifact_kind = if command == ProjectCommand::Check {
+        "interface"
+    } else {
+        "object"
+    };
+    let produced = compile_packages(
+        compiler,
+        graph,
+        target,
+        artifact_kind,
+        &capabilities.compiler_id,
+        &order,
+        &workspace.artifact_directory,
+    )?;
+    if command != ProjectCommand::Check {
+        link_executable(compiler, graph, target, &produced)?;
+    }
+    if command == ProjectCommand::Run {
+        run_executable(&executable_output(graph, target)?)?;
+    }
+    Ok(())
+}
+
+fn create_build_workspace(
+    graph: &PackageGraph,
+    command: ProjectCommand,
+    target: Target,
+) -> Result<BuildWorkspace, ProcessFailure> {
+    if command == ProjectCommand::Check {
+        let temporary = TemporaryBuildDirectory::create()?;
+        return Ok(BuildWorkspace {
+            artifact_directory: temporary.path.clone(),
+            _temporary: Some(temporary),
+            _lock: None,
+        });
+    }
+    let root = graph
+        .packages
+        .get(&graph.root_package)
+        .ok_or_else(|| process_error("package graph is missing its root package".to_owned()))?;
+    let target_directory = windows_compatible_path(&root.package_root)
+        .join("target")
+        .join(target.to_string());
+    let lock = BuildLock::acquire(&target_directory)?;
+    let artifact_directory = target_directory.join("packages");
+    fs::create_dir_all(&artifact_directory).map_err(|error| {
+        process_error(format!(
+            "could not create package artifact directory '{}': {error}",
+            display_path(&artifact_directory)
+        ))
+    })?;
+    Ok(BuildWorkspace {
+        artifact_directory,
+        _temporary: None,
+        _lock: Some(lock),
+    })
+}
+
+fn compile_packages(
+    compiler: &Path,
+    graph: &PackageGraph,
+    target: Target,
+    artifact_kind: &str,
+    compiler_id: &str,
+    order: &[String],
+    artifact_directory: &Path,
+) -> Result<BTreeMap<String, ProducedArtifact>, ProcessFailure> {
+    let mut produced = BTreeMap::<String, ProducedArtifact>::new();
+    for package_name in order {
+        let package = graph
+            .packages
+            .get(package_name)
+            .ok_or_else(|| process_error("ordered package is missing".to_owned()))?;
+        let output = artifact_directory.join(format!("{package_name}.cpa"));
+        let arguments = compile_arguments(
+            graph,
+            package_name,
+            target,
+            artifact_kind,
+            &output,
+            &produced,
+        )?;
+        let captured = invoke_compiler(compiler, &arguments, RECEIPT_LIMIT)?;
+        require_compiler_success(compiler, package_name, "compile", &captured)?;
+        let receipt = parse_receipt(&captured.stdout)?;
+        validate_compile_receipt(
+            &receipt,
+            package,
+            artifact_kind,
+            target,
+            compiler_id,
+            graph,
+            &produced,
+        )?;
+        if !output.is_file() {
+            return Err(process_error(format!(
+                "compiler reported success without artifact '{}'",
+                display_path(&output)
+            )));
+        }
+        produced.insert(
+            package_name.clone(),
+            ProducedArtifact {
+                path: output,
+                receipt,
+            },
+        );
+    }
+
+    Ok(produced)
+}
+
+fn compile_arguments(
+    graph: &PackageGraph,
+    package_name: &str,
+    target: Target,
+    artifact_kind: &str,
+    output: &Path,
+    produced: &BTreeMap<String, ProducedArtifact>,
+) -> Result<Vec<OsString>, ProcessFailure> {
+    let package = graph
+        .packages
+        .get(package_name)
+        .ok_or_else(|| process_error("ordered package is missing".to_owned()))?;
+    let mut arguments = vec![
+        OsString::from("--shuttle-protocol"),
+        OsString::from(PROTOCOL_V2),
+        OsString::from("--operation"),
+        OsString::from("compile"),
+        OsString::from("--target"),
+        OsString::from(target.to_string()),
+        OsString::from("--artifact-kind"),
+        OsString::from(artifact_kind),
+        OsString::from("--output"),
+        protocol_path_argument(output),
+        OsString::from("--package"),
+        OsString::from(&package.name),
+        OsString::from(package.version.to_string()),
+        protocol_path_argument(&package.source_root),
+    ];
+    if package_name == graph.root_package {
+        if let Some(executable) = &graph.root_executable {
+            arguments.extend([
+                OsString::from("--entry"),
+                executable.entry.as_os_str().to_owned(),
+            ]);
+        }
+    }
+    for dependency in graph
+        .dependencies
+        .iter()
+        .filter(|dependency| dependency.owner == package_name)
+    {
+        arguments.extend([
+            OsString::from("--dependency"),
+            OsString::from(&dependency.alias),
+            OsString::from(&dependency.target),
+        ]);
+    }
+    for dependency_name in transitive_dependencies(graph, package_name) {
+        let artifact = produced.get(&dependency_name).ok_or_else(|| {
+            process_error(format!(
+                "package '{package_name}' was scheduled before dependency '{dependency_name}'"
+            ))
+        })?;
+        arguments.extend([
+            OsString::from("--artifact"),
+            OsString::from(&artifact.receipt.package.name),
+            OsString::from(&artifact.receipt.package.version),
+            OsString::from(&artifact.receipt.artifact_id),
+            protocol_path_argument(&artifact.path),
+        ]);
+    }
+    Ok(arguments)
+}
+
+fn link_executable(
+    compiler: &Path,
+    graph: &PackageGraph,
+    target: Target,
+    produced: &BTreeMap<String, ProducedArtifact>,
+) -> Result<(), ProcessFailure> {
+    let executable = graph.root_executable.as_ref().ok_or_else(|| {
+        process_error(format!(
+            "package '{}' has no [executable] target",
+            graph.root_package
+        ))
+    })?;
+    let output = executable_output(graph, target)?;
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            process_error(format!(
+                "could not create executable directory '{}': {error}",
+                display_path(parent)
+            ))
+        })?;
+    }
+    let mut arguments = vec![
+        OsString::from("--shuttle-protocol"),
+        OsString::from(PROTOCOL_V2),
+        OsString::from("--operation"),
+        OsString::from("link"),
+        OsString::from("--target"),
+        OsString::from(target.to_string()),
+        OsString::from("--output"),
+        protocol_path_argument(&output),
+        OsString::from("--root-package"),
+        OsString::from(&graph.root_package),
+        OsString::from("--entry"),
+        executable.entry.as_os_str().to_owned(),
+    ];
+    for artifact in produced.values() {
+        arguments.push(OsString::from("--artifact"));
+        arguments.push(OsString::from(&artifact.receipt.package.name));
+        arguments.push(OsString::from(&artifact.receipt.package.version));
+        arguments.push(OsString::from(&artifact.receipt.artifact_id));
+        arguments.push(protocol_path_argument(&artifact.path));
+    }
+    let captured = invoke_compiler(compiler, &arguments, 1)?;
+    require_compiler_success(compiler, &graph.root_package, "link", &captured)?;
+    if !captured.stdout.is_empty() {
+        return Err(process_error(
+            "compiler link operation produced unexpected stdout".to_owned(),
+        ));
+    }
+    if !output.is_file() {
+        return Err(process_error(format!(
+            "compiler reported link success without executable '{}'",
+            display_path(&output)
+        )));
+    }
+    Ok(())
+}
+
+fn run_executable(output: &Path) -> Result<(), ProcessFailure> {
+    let status = Command::new(output)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .map_err(|error| {
+            process_error(format!(
+                "could not run executable '{}': {error}",
+                display_path(output)
+            ))
+        })?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(program_status_failure(status.code()))
+    }
+}
+
+fn query_capabilities(compiler: &Path) -> Result<Capabilities, ProcessFailure> {
+    let arguments = [OsString::from("--shuttle-protocol-capabilities")];
+    let captured = invoke_compiler(compiler, &arguments, CAPABILITY_LIMIT)?;
+    if !captured.status.success() || captured.stderr_nonempty || captured.stdout_oversized {
+        return Err(process_error(format!(
+            "compiler '{}' does not provide valid Shuttle protocol capabilities",
+            display_path(compiler)
+        )));
+    }
+    parse_json_line(&captured.stdout, CAPABILITY_LIMIT, "capability response")
+}
+
+fn validate_capabilities(
+    capabilities: &Capabilities,
+    target: Target,
+    command: ProjectCommand,
+) -> Result<(), ProcessFailure> {
+    let target_name = target.to_string();
+    let targets = if command == ProjectCommand::Check {
+        &capabilities.interface_targets
+    } else {
+        &capabilities.object_targets
+    };
+    if capabilities.schema != 1
+        || !capabilities.protocols.contains(&2)
+        || !capabilities.artifact_formats.contains(&ARTIFACT_FORMAT)
+        || !valid_digest(&capabilities.compiler_id)
+        || !["compile", "inspect", "link"].iter().all(|required| {
+            capabilities
+                .operations
+                .iter()
+                .any(|value| value == required)
+        })
+        || !targets.contains(&target_name)
+    {
+        return Err(process_error(
+            "selected compiler lacks required Shuttle protocol-v2 capabilities".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn invoke_compiler(
+    compiler: &Path,
+    arguments: &[OsString],
+    stdout_limit: usize,
+) -> Result<CapturedProcess, ProcessFailure> {
+    let mut child = Command::new(compiler)
+        .args(arguments)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            process_error(format!(
+                "could not start compiler '{}': {error}",
+                display_path(compiler)
+            ))
+        })?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| process_error("could not capture compiler stdout".to_owned()))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| process_error("could not capture compiler stderr".to_owned()))?;
+    let stdout_thread = thread::spawn(move || -> std::io::Result<(Vec<u8>, bool)> {
+        let mut captured = Vec::new();
+        let mut oversized = false;
+        let mut buffer = [0_u8; 8192];
+        loop {
+            let count = stdout.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            let remaining = stdout_limit.saturating_sub(captured.len());
+            captured.extend_from_slice(&buffer[..count.min(remaining)]);
+            if count > remaining {
+                oversized = true;
+            }
+        }
+        Ok((captured, oversized))
+    });
+    let stderr_thread = thread::spawn(move || -> std::io::Result<bool> {
+        let mut found = false;
+        let mut buffer = [0_u8; 8192];
+        let stderr_output = std::io::stderr();
+        let mut destination = stderr_output.lock();
+        loop {
+            let count = stderr.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            found = true;
+            destination.write_all(&buffer[..count])?;
+            destination.flush()?;
+        }
+        Ok(found)
+    });
+    let status = child.wait().map_err(|error| {
+        process_error(format!(
+            "could not wait for compiler '{}': {error}",
+            display_path(compiler)
+        ))
+    })?;
+    let (stdout, stdout_oversized) = stdout_thread
+        .join()
+        .map_err(|_| process_error("compiler stdout reader panicked".to_owned()))?
+        .map_err(|error| process_error(format!("could not read compiler stdout: {error}")))?;
+    let stderr_nonempty = stderr_thread
+        .join()
+        .map_err(|_| process_error("compiler stderr reader panicked".to_owned()))?
+        .map_err(|error| process_error(format!("could not read compiler stderr: {error}")))?;
+    Ok(CapturedProcess {
+        status,
+        stdout,
+        stdout_oversized,
+        stderr_nonempty,
+    })
+}
+
+fn require_compiler_success(
+    compiler: &Path,
+    package: &str,
+    operation: &str,
+    captured: &CapturedProcess,
+) -> Result<(), ProcessFailure> {
+    if !captured.status.success() {
+        let mut failure = compiler_status_failure(captured.status.code());
+        if let Some(message) = &mut failure.message {
+            *message = format!(
+                "package '{package}', {operation}, compiler '{}': {message}",
+                display_path(compiler)
+            );
+        }
+        return Err(failure);
+    }
+    if captured.stdout_oversized {
+        return Err(process_error(format!(
+            "package '{package}', {operation}: compiler stdout exceeded its protocol limit"
+        )));
+    }
+    Ok(())
+}
+
+fn parse_receipt(bytes: &[u8]) -> Result<ArtifactReceipt, ProcessFailure> {
+    let receipt: ArtifactReceipt = parse_json_line(bytes, RECEIPT_LIMIT, "artifact receipt")?;
+    if receipt.schema != 1
+        || receipt.artifact_format != ARTIFACT_FORMAT
+        || !valid_digest(&receipt.artifact_id)
+        || !valid_digest(&receipt.compiler_id)
+        || !matches!(receipt.kind.as_str(), "interface" | "object")
+    {
+        return Err(process_error("artifact receipt is invalid".to_owned()));
+    }
+    let mut previous = None::<&str>;
+    for dependency in &receipt.dependencies {
+        if !valid_digest(&dependency.artifact_id)
+            || previous.is_some_and(|value| value >= dependency.alias.as_str())
+        {
+            return Err(process_error(
+                "artifact receipt dependencies are noncanonical".to_owned(),
+            ));
+        }
+        previous = Some(&dependency.alias);
+    }
+    Ok(receipt)
+}
+
+fn parse_json_line<T: for<'de> Deserialize<'de>>(
+    bytes: &[u8],
+    limit: usize,
+    description: &str,
+) -> Result<T, ProcessFailure> {
+    if bytes.len() > limit || !bytes.ends_with(b"\n") {
+        return Err(process_error(format!(
+            "{description} is missing its required bounded line"
+        )));
+    }
+    let mut body = &bytes[..bytes.len() - 1];
+    if body.ends_with(b"\r") {
+        body = &body[..body.len() - 1];
+    }
+    if body.is_empty() || body.contains(&b'\n') || body.contains(&b'\r') {
+        return Err(process_error(format!(
+            "{description} contains trailing or multiline data"
+        )));
+    }
+    serde_json::from_slice(body)
+        .map_err(|error| process_error(format!("malformed {description}: {error}")))
+}
+
+fn validate_compile_receipt(
+    receipt: &ArtifactReceipt,
+    package: &crate::graph::PackageRecord,
+    kind: &str,
+    target: Target,
+    compiler_id: &str,
+    graph: &PackageGraph,
+    produced: &BTreeMap<String, ProducedArtifact>,
+) -> Result<(), ProcessFailure> {
+    if receipt.kind != kind
+        || receipt.package.name != package.name
+        || receipt.package.version != package.version.to_string()
+        || receipt.target != target.to_string()
+        || receipt.compiler_id != compiler_id
+    {
+        return Err(process_error(format!(
+            "compiler receipt does not match package '{}'",
+            package.name
+        )));
+    }
+    let expected = graph
+        .dependencies
+        .iter()
+        .filter(|dependency| dependency.owner == package.name)
+        .map(|dependency| {
+            let artifact = produced.get(&dependency.target).ok_or_else(|| {
+                process_error(format!(
+                    "receipt dependency '{}' was not produced",
+                    dependency.target
+                ))
+            })?;
+            Ok(ReceiptDependency {
+                alias: dependency.alias.clone(),
+                package: artifact.receipt.package.clone(),
+                artifact_id: artifact.receipt.artifact_id.clone(),
+            })
+        })
+        .collect::<Result<Vec<_>, ProcessFailure>>()?;
+    if receipt.dependencies != expected {
+        return Err(process_error(format!(
+            "compiler receipt dependency set does not match package '{}'",
+            package.name
+        )));
+    }
+    Ok(())
+}
+
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn topological_order(graph: &PackageGraph) -> Result<Vec<String>, ProcessFailure> {
+    let mut indegrees = graph
+        .packages
+        .keys()
+        .map(|name| (name.clone(), 0_usize))
+        .collect::<BTreeMap<_, _>>();
+    let mut dependents = BTreeMap::<String, Vec<String>>::new();
+    for dependency in &graph.dependencies {
+        *indegrees
+            .get_mut(&dependency.owner)
+            .ok_or_else(|| process_error("dependency owner is missing".to_owned()))? += 1;
+        dependents
+            .entry(dependency.target.clone())
+            .or_default()
+            .push(dependency.owner.clone());
+    }
+    let mut ready = indegrees
+        .iter()
+        .filter(|(_, degree)| **degree == 0)
+        .map(|(name, _)| name.clone())
+        .collect::<BTreeSet<_>>();
+    let mut order = Vec::with_capacity(graph.packages.len());
+    while let Some(name) = ready.pop_first() {
+        order.push(name.clone());
+        if let Some(packages) = dependents.get(&name) {
+            for package in packages {
+                let degree = indegrees
+                    .get_mut(package)
+                    .ok_or_else(|| process_error("dependent package is missing".to_owned()))?;
+                *degree -= 1;
+                if *degree == 0 {
+                    ready.insert(package.clone());
+                }
+            }
+        }
+    }
+    if order.len() != graph.packages.len() {
+        return Err(process_error(
+            "package graph contains a dependency cycle".to_owned(),
+        ));
+    }
+    Ok(order)
+}
+
+fn transitive_dependencies(graph: &PackageGraph, package: &str) -> BTreeSet<String> {
+    let mut result = BTreeSet::new();
+    let mut pending = graph
+        .dependencies
+        .iter()
+        .filter(|dependency| dependency.owner == package)
+        .map(|dependency| dependency.target.clone())
+        .collect::<Vec<_>>();
+    while let Some(current) = pending.pop() {
+        if !result.insert(current.clone()) {
+            continue;
+        }
+        pending.extend(
+            graph
+                .dependencies
+                .iter()
+                .filter(|dependency| dependency.owner == current)
+                .map(|dependency| dependency.target.clone()),
+        );
+    }
+    result
+}
+
+fn executable_output(graph: &PackageGraph, target: Target) -> Result<PathBuf, ProcessFailure> {
+    let root = graph
+        .packages
+        .get(&graph.root_package)
+        .ok_or_else(|| process_error("package graph is missing its root package".to_owned()))?;
+    let executable = graph.root_executable.as_ref().ok_or_else(|| {
+        process_error(format!(
+            "package '{}' has no [executable] target",
+            graph.root_package
+        ))
+    })?;
+    let mut file_name = executable.name.clone();
+    if !std::env::consts::EXE_EXTENSION.is_empty() {
+        file_name.push('.');
+        file_name.push_str(std::env::consts::EXE_EXTENSION);
+    }
+    Ok(windows_compatible_path(&root.package_root)
+        .join("target")
+        .join(target.to_string())
+        .join(file_name))
 }
 
 /// Selects an absolute compiler executable using the protocol precedence.
@@ -288,7 +1076,7 @@ fn verify_protocol(compiler: &Path) -> Result<(), ProcessFailure> {
 
 fn canonical_executable(path: &Path) -> Result<PathBuf, String> {
     match fs::canonicalize(path) {
-        Ok(path) if path.is_file() => Ok(path),
+        Ok(path) if path.is_file() => Ok(windows_compatible_path(&path)),
         Ok(_) => Err("path is not a regular file".to_owned()),
         Err(error) => Err(error.to_string()),
     }

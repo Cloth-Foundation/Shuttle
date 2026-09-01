@@ -1,3 +1,7 @@
+// Part of the Cloth Compiler project, under the Apache License v2.0 with LLVM
+// Exceptions. See LICENSE.txt in the project root for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 //! Opt-in execution tests; require a compiler with its native toolchain.
 #[allow(dead_code)]
 mod support;
@@ -12,13 +16,20 @@ fn builds_and_runs_only_the_selected_root_entry() {
     let built = run(&mut fixture.shuttle("build", &compiler()));
     expect_status(&built, 0);
     assert!(built.stdout.is_empty() && built.stderr.is_empty());
-    assert_eq!(
-        fs::read_dir(fixture.root.join("app/target/x86_64"))
-            .expect("output directory")
-            .count(),
-        1,
-        "temporary native artifacts remain"
+    let target = fixture.root.join("app/target/x86_64");
+    assert!(
+        target
+            .join(format!("app{}", std::env::consts::EXE_SUFFIX))
+            .is_file()
     );
+    let artifacts = fs::read_dir(target.join("packages"))
+        .expect("package artifacts")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("package artifact entries");
+    assert_eq!(artifacts.len(), 4);
+    assert!(artifacts.iter().all(|entry| {
+        entry.path().is_file() && entry.path().extension().is_some_and(|value| value == "cpa")
+    }));
     let output = run(&mut fixture.shuttle("run", &compiler()));
     expect_status(&output, 0);
     assert_eq!(

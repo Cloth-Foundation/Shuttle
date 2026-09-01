@@ -9,8 +9,9 @@ in owning contracts rather than only recorded as completed checkboxes.
 Stage 22 is complete. Stage 23 is active; the
 [process-v2 proposal](docs/proposals/compiler_protocol_v2.md) and its companion
 compiler artifact proposal were approved with implementation authorization on
-2026-08-31. Compiler identity/artifact foundations precede process integration.
-Shared verification is documented in `docs/testing.md`.
+2026-08-31. Protocol-v2 ordered compilation and link orchestration are
+complete; Stage 23.4 owns equivalence and exit verification. Shared
+verification is documented in `docs/testing.md`.
 
 ## Scheduled work
 
@@ -37,11 +38,11 @@ Shared verification is documented in `docs/testing.md`.
   [process-v2 proposals](docs/proposals/compiler_protocol_v2.md), including
   public receipts, exact compatibility, check-only artifacts, output ownership,
   and the boundary between artifact reuse and deferred automatic caching.
-- [ ] **23.2 — Ordered compilation.** Compile local dependency packages in a
+- [x] **23.2 — Ordered compilation.** Compile local dependency packages in a
   deterministic topological order, consume and validate public compiler receipts,
   and reuse each compatible artifact across consumers within one invocation
   without depending on private compiler representations.
-- [ ] **23.3 — Link orchestration.** Invoke the approved link pipeline and add
+- [x] **23.3 — Link orchestration.** Invoke the approved link pipeline and add
   package context while preserving compiler and linker diagnostics.
 - [ ] **23.4 — Equivalence verification.** Prove clean and reused builds match
   whole-project behavior, then close the shared integration and Shuttle exit

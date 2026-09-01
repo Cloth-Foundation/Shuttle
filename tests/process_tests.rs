@@ -1,3 +1,7 @@
+// Part of the Cloth Compiler project, under the Apache License v2.0 with LLVM
+// Exceptions. See LICENSE.txt in the project root for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #[allow(dead_code)]
 mod support;
 
@@ -8,7 +12,9 @@ mod compiler_stub;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use support::{Fixture, expect_status, run};
 
@@ -39,6 +45,15 @@ fn phases(fixture: &Fixture) -> Vec<String> {
         .expect("calls log")
         .lines()
         .map(|line| line.split(':').next().expect("phase").to_owned())
+        .collect()
+}
+
+fn compiled_packages(fixture: &Fixture) -> Vec<String> {
+    fs::read_to_string(fixture.root.join("calls.log"))
+        .expect("calls log")
+        .lines()
+        .filter_map(|line| line.strip_prefix("compile:"))
+        .map(|line| line.split(':').next().expect("package").to_owned())
         .collect()
 }
 
@@ -75,9 +90,27 @@ fn rejects_incompatible_queries_without_compilation_or_output_creation() {
         assert!(
             String::from_utf8(output.stderr)
                 .expect("diagnostic")
-                .contains("does not support Shuttle protocol")
+                .contains("capabilit")
         );
         assert!(phases(&fixture).iter().all(|phase| phase == "query"));
+        assert!(!fixture.root.join("app/target").exists());
+    }
+}
+
+#[test]
+fn rejects_malformed_or_mismatched_compile_receipts() {
+    for mode in [
+        "receipt-no-newline",
+        "receipt-trailing",
+        "receipt-wrong-package",
+        "receipt-bad-digest",
+    ] {
+        let fixture = Fixture::new();
+        let compiler = stub(&fixture);
+        let output = run(&mut command(&fixture, &compiler, "check", mode));
+        expect_status(&output, 2);
+        assert!(output.stdout.is_empty());
+        assert!(!phases(&fixture).iter().any(|phase| phase == "link"));
         assert!(!fixture.root.join("app/target").exists());
     }
 }
@@ -94,7 +127,7 @@ fn preserves_compiler_failures_and_reports_abnormal_status_with_context() {
         assert!(error.starts_with("fixture.co:3:5: error: stub rejection"));
         if mode == "compile-42" {
             assert!(
-                error.contains("app") && error.contains("compiler stub"),
+                error.contains("foundation") && error.contains("compiler stub"),
                 "{error}"
             );
             assert!(error.contains("42"));
@@ -122,7 +155,45 @@ fn runs_only_after_success_and_forwards_program_streams_and_status() {
         String::from_utf8(output.stderr).expect("stderr").trim(),
         "program stderr"
     );
-    assert_eq!(phases(&fixture), ["query", "compile", "run"]);
+    assert_eq!(
+        phases(&fixture),
+        [
+            "query", "compile", "compile", "compile", "compile", "link", "run"
+        ]
+    );
+    assert_eq!(
+        compiled_packages(&fixture),
+        ["foundation", "data-models", "tools", "app"]
+    );
+}
+
+#[test]
+fn rejects_a_concurrent_writer_for_the_same_target() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    let mut first = command(&fixture, &compiler, "build", "compile-wait");
+    let child = first
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("start first build");
+    let start = Instant::now();
+    while !fs::read_to_string(fixture.root.join("calls.log"))
+        .is_ok_and(|log| log.contains("compile:"))
+    {
+        assert!(start.elapsed() < Duration::from_secs(10));
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let second = run(&mut command(&fixture, &compiler, "build", ""));
+    expect_status(&second, 2);
+    assert!(
+        String::from_utf8(second.stderr)
+            .expect("lock diagnostic")
+            .contains("owns")
+    );
+    let first_output = child.wait_with_output().expect("finish first build");
+    expect_status(&first_output, 0);
 }
 
 #[test]

@@ -1,3 +1,7 @@
+// Part of the Cloth Compiler project, under the Apache License v2.0 with LLVM
+// Exceptions. See LICENSE.txt in the project root for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output};
@@ -21,7 +25,7 @@ fn project(manifest: &str) -> TempDir {
 }
 
 #[test]
-fn help_exposes_only_the_stage_twenty_two_commands() {
+fn help_exposes_only_the_supported_commands() {
     let project = TempDir::new().expect("create temporary directory");
     let output = shuttle(project.path(), &["--help"]);
 
