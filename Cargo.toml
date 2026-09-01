@@ -8,8 +8,10 @@ publish = false
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
+fs2 = "0.4"
 semver = "1.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 # Manifest version 1 is pinned to TOML 1.0.0. Later 0.9 releases parse TOML 1.1.
 toml = { version = "=0.9.9", default-features = false, features = ["parse", "serde", "std"] }
 

@@ -1,6 +1,8 @@
 import models::User as ModelUser;
 import tools.*;
 
+static func Main(int32 value): int32 { return value; }
+
 static func Main(): int32 {
   println(ModelUser.Value() + Helper.Value() + User.Value());
   return 0;

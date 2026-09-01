@@ -64,8 +64,8 @@ Status: **active**
 
 The [process-v2 proposal](docs/proposals/compiler_protocol_v2.md) and its linked
 compiler artifact proposal were approved with implementation authorization on
-2026-08-31. Compiler identity/artifact foundations precede Shuttle's process-v2
-integration; approval does not claim those operations already exist.
+2026-08-31. Ordered package compilation and link orchestration are implemented
+through Stage 23.3. Stage 23.4 owns equivalence and exit verification.
 
 Objective: orchestrate independent local-package compilation and deterministic
 linking through the compiler-owned, versioned artifact contract.

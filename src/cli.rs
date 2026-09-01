@@ -1,8 +1,14 @@
+// Part of the Cloth Compiler project, under the Apache License v2.0 with LLVM
+// Exceptions. See LICENSE.txt in the project root for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 use std::path::{Path, PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 
-use crate::compiler::{ProjectCommand, Target, build_request, execute_request, select_compiler};
+use crate::compiler::{
+    ProjectCommand, Target, execute_graph, select_compiler, validate_project_command,
+};
 use crate::diagnostic::Diagnostic;
 use crate::graph::resolve_package_graph;
 use crate::manifest::resolve_manifest_path;
@@ -71,7 +77,7 @@ pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure>
         exit_code: 1,
         diagnostics,
     })?;
-    let request = build_request(&graph, project_command, options.target).map_err(|diagnostic| {
+    validate_project_command(&graph, project_command, options.target).map_err(|diagnostic| {
         CommandFailure {
             exit_code: 1,
             diagnostics: vec![diagnostic],
@@ -84,12 +90,14 @@ pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure>
                 diagnostics: vec![diagnostic],
             }
         })?;
-    execute_request(&compiler, &request).map_err(|failure| CommandFailure {
-        exit_code: failure.exit_code,
-        diagnostics: failure
-            .message
-            .map(Diagnostic::global)
-            .into_iter()
-            .collect(),
+    execute_graph(&compiler, &graph, project_command, options.target).map_err(|failure| {
+        CommandFailure {
+            exit_code: failure.exit_code,
+            diagnostics: failure
+                .message
+                .map(Diagnostic::global)
+                .into_iter()
+                .collect(),
+        }
     })
 }

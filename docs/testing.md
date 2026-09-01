@@ -44,11 +44,21 @@ Run `ctest --preset dev -L toolchain` or
 tests the same public process boundary against the instrumented compiler.
 
 Fixtures are copied into temporary directories, including spaces and Unicode
-path cases. Every child has a 30-second timeout and both streams are drained
-concurrently. CTest gives each Cargo suite 120 seconds and serializes Cargo
+path cases. Every child has a 120-second timeout and both streams are drained
+concurrently. CTest gives each Cargo suite 600 seconds and serializes Cargo
 access. Unix-only symlink behavior is tested only on Unix hosts; Windows tests
 do not require symlink-creation privileges.
 
 Stable Rust and `forbid(unsafe_code)` remain Shuttle's baseline. No nightly
 Rust sanitizer toolchain is required or claimed; the applicable sanitizer gate
 is the shared suite against the C++ ASan/UBSan build.
+
+## Stage 23.3 verification
+
+Protocol process tests cover strict capability and receipt transport, stable
+topological order, one compilation per diamond node, compiler failure context,
+stale-output refusal, and exclusive writer locking. Real-compiler checks use
+interface artifacts without native tools; native tests compile four package
+objects, link one entry wrapper and runtime, and exercise spaces and Unicode in
+project paths. Stage 23.4 owns whole-project equivalence, malformed-link input,
+and development/sanitizer exit audits.

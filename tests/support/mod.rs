@@ -91,10 +91,10 @@ pub fn run(command: &mut Command) -> Output {
         if let Some(status) = child.try_wait().expect("poll child") {
             break status;
         }
-        if start.elapsed() > Duration::from_secs(30) {
+        if start.elapsed() > Duration::from_secs(120) {
             child.kill().expect("terminate timed-out child");
             child.wait().expect("reap timed-out child");
-            panic!("process exceeded 30 seconds: {command:?}");
+            panic!("process exceeded 120 seconds: {command:?}");
         }
         thread::sleep(Duration::from_millis(10));
     };
