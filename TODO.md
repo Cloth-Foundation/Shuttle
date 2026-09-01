@@ -4,13 +4,9 @@
 concrete work required to close those stages. Public behavior must be documented
 in owning contracts rather than only recorded as completed checkboxes.
 
-## Active stage
+## Stage status
 
-Stage 22 is complete. Stage 23 is active; the
-[process-v2 proposal](docs/proposals/compiler_protocol_v2.md) and its companion
-compiler artifact proposal were approved with implementation authorization on
-2026-08-31. Protocol-v2 ordered compilation and link orchestration are
-complete; Stage 23.4 owns equivalence and exit verification. Shared
+Stages 22 and 23 are complete. No later Shuttle stage is active. Shared
 verification is documented in `docs/testing.md`.
 
 ## Scheduled work
@@ -44,7 +40,7 @@ verification is documented in `docs/testing.md`.
   without depending on private compiler representations.
 - [x] **23.3 — Link orchestration.** Invoke the approved link pipeline and add
   package context while preserving compiler and linker diagnostics.
-- [ ] **23.4 — Equivalence verification.** Prove clean and reused builds match
+- [x] **23.4 — Equivalence verification.** Prove clean and reused builds match
   whole-project behavior, then close the shared integration and Shuttle exit
   audits.
 

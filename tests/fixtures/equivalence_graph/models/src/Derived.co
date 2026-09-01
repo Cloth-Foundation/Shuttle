@@ -1,0 +1,17 @@
+import foundation::Entity;
+
+class : Entity {
+  Derived(string name, int32 value): Entity(name, value) {}
+
+  final override func Score(): int32 {
+    return super.Score() + 1;
+  }
+
+  override func Label(): string {
+    return super.Label() + "->Derived";
+  }
+
+  override func Copy(): Derived {
+    return self;
+  }
+}

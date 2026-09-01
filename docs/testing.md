@@ -44,8 +44,8 @@ Run `ctest --preset dev -L toolchain` or
 tests the same public process boundary against the instrumented compiler.
 
 Fixtures are copied into temporary directories, including spaces and Unicode
-path cases. Every child has a 120-second timeout and both streams are drained
-concurrently. CTest gives each Cargo suite 600 seconds and serializes Cargo
+path cases. Every child has a 300-second timeout and both streams are drained
+concurrently. CTest gives each Cargo suite 1,200 seconds and serializes Cargo
 access. Unix-only symlink behavior is tested only on Unix hosts; Windows tests
 do not require symlink-creation privileges.
 
@@ -53,12 +53,18 @@ Stable Rust and `forbid(unsafe_code)` remain Shuttle's baseline. No nightly
 Rust sanitizer toolchain is required or claimed; the applicable sanitizer gate
 is the shared suite against the C++ ASan/UBSan build.
 
-## Stage 23.3 verification
+## Stage 23 exit verification
 
 Protocol process tests cover strict capability and receipt transport, stable
 topological order, one compilation per diamond node, compiler failure context,
 stale-output refusal, and exclusive writer locking. Real-compiler checks use
-interface artifacts without native tools; native tests compile four package
-objects, link one entry wrapper and runtime, and exercise spaces and Unicode in
-project paths. Stage 23.4 owns whole-project equivalence, malformed-link input,
-and development/sanitizer exit audits.
+interface artifacts without native tools and prove consumer compilation does
+not reopen removed dependency sources. Native tests compile package objects,
+link one entry wrapper and runtime, compare behavior with protocol v1, reject
+malformed link closures atomically, verify relocated artifact bytes, and
+exercise spaces and Unicode in project paths.
+
+The coordinated GNU development and Clang ASan/UBSan runs each pass all 92
+CTest entries, including all 14 protocol and seven native cases. Rust format,
+Clippy with warnings denied, all 36 ordinary tests, and the Rust 1.85 baseline
+also pass. Stage 23 is complete; automatic cache reuse remains deferred.

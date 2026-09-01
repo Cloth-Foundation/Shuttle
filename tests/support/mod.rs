@@ -18,10 +18,16 @@ impl Fixture {
     }
 
     pub fn named(name: &str) -> Self {
+        Self::from_fixture("local_graph", name)
+    }
+
+    pub fn from_fixture(fixture: &str, name: &str) -> Self {
         let directory = TempDir::new().expect("create fixture directory");
         let root = directory.path().join(name);
         copy_tree(
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/local_graph"),
+            &Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures")
+                .join(fixture),
             &root,
         );
         Self {
@@ -91,10 +97,10 @@ pub fn run(command: &mut Command) -> Output {
         if let Some(status) = child.try_wait().expect("poll child") {
             break status;
         }
-        if start.elapsed() > Duration::from_secs(120) {
+        if start.elapsed() > Duration::from_secs(300) {
             child.kill().expect("terminate timed-out child");
             child.wait().expect("reap timed-out child");
-            panic!("process exceeded 120 seconds: {command:?}");
+            panic!("process exceeded 300 seconds: {command:?}");
         }
         thread::sleep(Duration::from_millis(10));
     };

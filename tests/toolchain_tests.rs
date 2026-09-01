@@ -8,11 +8,33 @@ mod support;
 
 use std::ffi::OsString;
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
+use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
 use support::{Fixture, compiler, expect_status, run};
+
+#[derive(Clone, Debug)]
+struct ProtocolArtifact {
+    name: String,
+    version: String,
+    digest: String,
+    path: PathBuf,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReceiptPackage {
+    name: String,
+    version: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ArtifactReceipt {
+    artifact_id: String,
+    package: ReceiptPackage,
+}
 
 fn arguments(fixture: &Fixture) -> Vec<OsString> {
     let graph = resolve_package_graph(&fixture.manifest()).expect("fixture graph");
@@ -34,6 +56,70 @@ fn replace(arguments: &mut [OsString], option: &str, value: &str) {
         .position(|argument| argument == option)
         .expect("option");
     arguments[position + 1] = value.into();
+}
+
+fn compile_interface(
+    fixture: &Fixture,
+    package: (&str, &str, &str),
+    entry: Option<&str>,
+    dependencies: &[(&str, &str)],
+    artifacts: &[ProtocolArtifact],
+) -> ProtocolArtifact {
+    let (name, version, source_root) = package;
+    let output = fixture.root.join("artifacts").join(format!("{name}.cpa"));
+    fs::create_dir_all(output.parent().expect("artifact parent"))
+        .expect("create artifact directory");
+    let mut arguments = vec![
+        "--shuttle-protocol".into(),
+        "2".into(),
+        "--operation".into(),
+        "compile".into(),
+        "--target".into(),
+        "wasm32".into(),
+        "--artifact-kind".into(),
+        "interface".into(),
+        "--output".into(),
+        output.clone().into_os_string(),
+        "--package".into(),
+        name.into(),
+        version.into(),
+        fixture.root.join(source_root).into_os_string(),
+    ];
+    if let Some(entry) = entry {
+        arguments.extend(["--entry".into(), entry.into()]);
+    }
+    for (alias, target) in dependencies {
+        arguments.extend(["--dependency".into(), (*alias).into(), (*target).into()]);
+    }
+    for artifact in artifacts {
+        arguments.extend([
+            "--artifact".into(),
+            artifact.name.clone().into(),
+            artifact.version.clone().into(),
+            artifact.digest.clone().into(),
+            artifact.path.clone().into_os_string(),
+        ]);
+    }
+    let result = run(Command::new(compiler())
+        .current_dir(&fixture.root)
+        .args(arguments));
+    expect_status(&result, 0);
+    assert!(result.stderr.is_empty());
+    let receipt: ArtifactReceipt =
+        serde_json::from_slice(&result.stdout).expect("artifact receipt");
+    assert_eq!(
+        (
+            receipt.package.name.as_str(),
+            receipt.package.version.as_str()
+        ),
+        (name, version)
+    );
+    ProtocolArtifact {
+        name: receipt.package.name,
+        version: receipt.package.version,
+        digest: receipt.artifact_id,
+        path: output,
+    }
 }
 
 #[test]
@@ -129,6 +215,82 @@ fn forwards_utf8_source_diagnostics_without_rewriting_them() {
         text.contains("Cloth \u{03bb} spaces &/app/src/Main.co:1:"),
         "{text}"
     );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn separate_and_whole_project_diagnostic_categories_are_equivalent() {
+    let fixture = Fixture::from_fixture("equivalence_graph", "diagnostic equivalence");
+    fixture.write(
+        "app/src/Bad.co",
+        "import models::Derived;\n\
+         class : Derived {\n\
+           Bad(): Derived(\"bad\", 0) {}\n\
+           override func Score(): int32 { return 0; }\n\
+         }\n",
+    );
+    let direct = invoke(&fixture, &arguments(&fixture));
+    let separate = run(&mut fixture.shuttle("check", &compiler()));
+    expect_status(&direct, 1);
+    expect_status(&separate, 1);
+    assert!(direct.stdout.is_empty() && separate.stdout.is_empty());
+    let direct = String::from_utf8(direct.stderr).expect("whole-project diagnostic");
+    let separate = String::from_utf8(separate.stderr).expect("separate diagnostic");
+    let messages = |text: &str| {
+        text.lines()
+            .map(|line| {
+                line.find(": error:")
+                    .or_else(|| line.find(": note:"))
+                    .map_or_else(|| line.to_owned(), |position| line[position..].to_owned())
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(messages(&direct), messages(&separate));
+    assert!(
+        separate
+            .lines()
+            .any(|line| line.starts_with("Derived.co:6:3: note:"))
+    );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn consumer_compilation_does_not_reopen_dependency_sources() {
+    let fixture = Fixture::new();
+    let foundation = compile_interface(
+        &fixture,
+        ("foundation", "1.0.0", "core/src"),
+        None,
+        &[],
+        &[],
+    );
+    fs::remove_dir_all(fixture.root.join("core/src")).expect("remove foundation sources");
+
+    let models = compile_interface(
+        &fixture,
+        ("data-models", "1.2.3-beta.1+local", "models/src"),
+        None,
+        &[("foundation", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    let tools = compile_interface(
+        &fixture,
+        ("tools", "0.2.0", "tools/src"),
+        None,
+        &[("base", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    fs::remove_dir_all(fixture.root.join("models/src")).expect("remove model sources");
+    fs::remove_dir_all(fixture.root.join("tools/src")).expect("remove tool sources");
+
+    let app = compile_interface(
+        &fixture,
+        ("app", "0.1.0", "app/src"),
+        Some("Main.co"),
+        &[("models", "data-models"), ("tools", "tools")],
+        &[models, foundation, tools],
+    );
+    assert!(app.path.is_file());
 }
 
 #[test]

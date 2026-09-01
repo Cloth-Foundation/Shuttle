@@ -1,7 +1,6 @@
 # Proposal: Shuttle-to-`clothc` protocol version 2
 
-Status: **approved Stage 23.1 contract; implemented in Stage 23.3,
-2026-09-01**.
+Status: **implemented; Stage 23 completed 2026-09-01**.
 
 The compiler's companion proposal is
 [`docs/proposals/stage_23_artifacts.md`](../../../docs/proposals/stage_23_artifacts.md)

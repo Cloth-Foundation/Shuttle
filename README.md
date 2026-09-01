@@ -71,11 +71,11 @@ and `run` place independently compiled package artifacts under
 
 ## Status
 
-Local projects, recursive local dependencies, and `check`, `build`, and `run`
-use compiler protocol version 2 for deterministic separate compilation and
-linking. Protocol version 1 remains available to older clients and explicit
-compiler tests. Automatic artifact reuse across commands, remote dependencies,
-and registries are not implemented.
+Stage 23 is complete. Local projects, recursive local dependencies, and
+`check`, `build`, and `run` use compiler protocol version 2 for deterministic
+separate compilation and linking. Protocol version 1 remains available to older
+clients and explicit compiler tests. Automatic artifact reuse across commands,
+remote dependencies, and registries are not implemented.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.
