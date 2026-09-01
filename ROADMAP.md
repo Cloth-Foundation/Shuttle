@@ -13,7 +13,7 @@ criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
 Stage 22 is complete, including the shared process, native, and sanitizer
-verification. Stage 23 is active under the approved shared contract.
+verification. Stage 23 is also complete. No later Shuttle stage is active.
 
 ## Stage 22: Local projects and compiler build protocol
 
@@ -60,12 +60,13 @@ the coordinated exit audit.
 
 ## Stage 23: Separate compilation and deterministic linking
 
-Status: **active**
+Status: **complete**
 
 The [process-v2 proposal](docs/proposals/compiler_protocol_v2.md) and its linked
 compiler artifact proposal were approved with implementation authorization on
 2026-08-31. Ordered package compilation and link orchestration are implemented
-through Stage 23.3. Stage 23.4 owns equivalence and exit verification.
+through Stage 23.3. Stage 23.4 completed equivalence and exit verification on
+2026-09-01.
 
 Objective: orchestrate independent local-package compilation and deterministic
 linking through the compiler-owned, versioned artifact contract.

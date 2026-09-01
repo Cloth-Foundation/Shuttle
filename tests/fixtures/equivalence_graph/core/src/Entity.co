@@ -1,0 +1,23 @@
+abstract class is Scored {
+  string NameValue;
+  int32 Value;
+
+  Entity(string name, int32 value) {
+    NameValue = name;
+    Value = value;
+  }
+
+  func Name(): string {
+    return NameValue;
+  }
+
+  func Score(): int32 {
+    return Value;
+  }
+
+  func Label(): string {
+    return "Entity";
+  }
+
+  abstract func Copy(): Entity;
+}

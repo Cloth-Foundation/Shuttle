@@ -1,0 +1,8 @@
+manifest-version = 1
+
+[package]
+name = "data-models"
+version = "1.0.0"
+
+[dependencies]
+foundation = { path = "../core" }

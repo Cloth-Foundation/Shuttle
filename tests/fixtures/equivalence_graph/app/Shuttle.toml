@@ -1,0 +1,12 @@
+manifest-version = 1
+
+[package]
+name = "app"
+version = "1.0.0"
+
+[executable]
+entry = "Main.co"
+
+[dependencies]
+contracts = { path = "../core" }
+models = { path = "../models" }

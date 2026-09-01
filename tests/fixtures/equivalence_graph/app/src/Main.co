@@ -1,0 +1,53 @@
+import contracts::Entity;
+import contracts::Named;
+import contracts::Scored;
+import models::Derived;
+
+static func Main(): int32 {
+  Derived value = Derived("Cloth", 40);
+  Entity parent = value;
+  Scored scored = value;
+  Named named = scored;
+
+  println(value.Value);
+  println(value.Score());
+  println(scored.Score());
+  println(named.Name());
+  println(parent.Label());
+  println(parent.Copy() is Derived);
+  println(value::typeName);
+
+  object boxed = value;
+  println(boxed is Entity);
+  println(boxed is Scored);
+  Derived? restored = boxed as Derived?;
+  string restoredName = "missing";
+  if (restored) {
+    restoredName = restored.Name();
+  }
+  println(restoredName);
+
+  Derived[] values = [value, Derived("Other", 1)];
+  int32 total = 0;
+  for (Derived item in values) {
+    total = total + item.Score();
+  }
+  println(total);
+  println(values::length);
+
+  Box? head = null;
+  int32 index = 0;
+  while (index < 2000) {
+    head = Box(value, head);
+    index = index + 1;
+  }
+  int32 count = 0;
+  while (head) {
+    count = count + 1;
+    head = head.Next;
+  }
+  println(count);
+  println(value.Name());
+  println(value.Name()::length);
+  return 0;
+}

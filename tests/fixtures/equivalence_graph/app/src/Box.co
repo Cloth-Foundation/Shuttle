@@ -1,0 +1,9 @@
+import models::Derived;
+
+Derived? Item;
+Box? Next;
+
+Box(Derived? item, Box? next) {
+  Item = item;
+  Next = next;
+}
