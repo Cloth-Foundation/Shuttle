@@ -15,8 +15,22 @@ explicit implementation go-ahead.
 Stage 22 is complete, including the shared process, native, and sanitizer
 verification. Stages 23 through 26 are also complete, including the approved
 aggregate compatibility transition and the coordinated equivalence and exit
-audit. The compiler roadmap owns the language and ABI contracts; no later
-Shuttle stage is activated by this completion.
+audit. The coordinated 26.5.1 override follow-up is also complete. The compiler
+roadmap owns the language and ABI contracts; no further stage is activated.
+
+## Stage 26.5.1: Explicit interface-override compatibility
+
+Status: **complete — coordinated audit passed 2026-09-02**
+
+The [exit audit](docs/testing.md#stage-2651-explicit-interface-overrides) records
+shared source-free/native verification with both compilers and the Rust gates.
+
+Update shared interface fixtures for mandatory local `override` and verify
+source-free enforcement, inherited implementation reuse, diagnostics, and native
+dispatch with both compiler configurations. Artifact format 3, compiler ABI 4,
+runtime ABI 2, and all process/receipt/manifest protocols remain unchanged.
+No scheduling or dependency-resolution feature is included. Close after the
+compiler/editor audit and ordinary Rust plus shared toolchain/native gates pass.
 
 ## Stage 26: Aggregate artifact compatibility
 

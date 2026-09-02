@@ -87,7 +87,7 @@ struct {
 class is Transformer {
   Packet Initial;
   Processor(Packet initial) { Initial = initial; }
-  func Transform(Data value): Packet { return Packet(Data.Change(value)); }
+  override func Transform(Data value): Packet { return Packet(Data.Change(value)); }
 }
 ",
         );

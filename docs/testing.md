@@ -195,3 +195,19 @@ Struct fixtures prove:
 Format 3, compiler ABI 4, runtime ABI 2, process protocol 2, receipt schema 1,
 and manifest schema 1 are unchanged by this audit. No scheduling policy,
 new build system, remote dependency feature, or subsequent stage is introduced.
+
+## Stage 26.5.1 explicit interface overrides
+
+Verified on Windows on 2026-09-02 with both compiler configurations. Each passes
+122 CTests, including all 22 shared protocol and 12 native tests. All 43 ordinary
+Rust tests, Rust 1.85 checking, formatting, and Clippy with warnings denied pass.
+
+Shared implementing declarations now use `override`. The source-free struct
+consumer test rejects missing and unmatched markers, preserves the completed
+artifact on failure, then accepts the corrected interface implementation.
+Native dispatch, inherited calls, whole-project/separate equivalence,
+serial/parallel bytes, and reuse/invalidation remain covered by existing suites.
+
+The compiler/editor audit is complete. Artifacts remain opaque to Shuttle;
+format 3, compiler ABI 4, runtime ABI 2, process protocol 2, receipt schema 1,
+and manifest schema 1 are unchanged. No new Shuttle feature is scheduled.

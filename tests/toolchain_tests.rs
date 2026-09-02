@@ -183,6 +183,42 @@ fn structs_are_available_without_dependency_sources() {
         assert!(diagnostic.contains("private"), "{diagnostic}");
         assert_eq!(fs::read(&app.path).expect("preserved artifact"), previous);
     }
+
+    fixture.write("app/src/Main.co", "static func Main() {}\n");
+    for (modifier, name, expected) in [
+        ("", "Transform", Some("add 'override'")),
+        ("override ", "Unmatched", Some("does not override")),
+        ("override ", "Transform", None),
+    ] {
+        fixture.write(
+            "app/src/Implementation.co",
+            &format!(
+                "import models::Transformer; import models::Data; import models::Packet;\n\
+                 class is Transformer {{\n\
+                 {modifier}func {name}(Data value): Packet {{ return Packet(value); }}\n\
+                 }}\n"
+            ),
+        );
+        let (mut command, _) = interface_command(
+            &fixture,
+            ("app", "0.1.0", "app/src"),
+            Some("Main.co"),
+            &[("models", "data-models"), ("tools", "tools")],
+            &artifacts,
+        );
+        let checked = run(&mut command);
+        expect_status(&checked, i32::from(expected.is_some()));
+        if let Some(expected) = expected {
+            assert!(checked.stdout.is_empty());
+            let diagnostic = String::from_utf8_lossy(&checked.stderr);
+            assert!(diagnostic.contains(expected), "{diagnostic}");
+            assert_eq!(fs::read(&app.path).expect("preserved artifact"), previous);
+        } else {
+            assert!(checked.stderr.is_empty());
+            let _: ArtifactReceipt =
+                serde_json::from_slice(&checked.stdout).expect("override consumer receipt");
+        }
+    }
 }
 
 #[test]

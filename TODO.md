@@ -13,7 +13,8 @@ Stage 26 coordination is complete. The approved 26.3 transition is implemented:
 capabilities and receipts require artifact format 3, while the compiler owns
 ABI 4 and runtime ABI 2 compatibility. Older packages must be rebuilt.
 The [26.4 exit audit](docs/testing.md#stage-264-struct-exit-audit) passed with
-development and sanitizer compilers on 2026-09-02. No later stage is active.
+development and sanitizer compilers on 2026-09-02. Stage 26.5.1 coordinated
+explicit-override verification is also complete; see `docs/testing.md`.
 
 ## Scheduled work
 
@@ -28,6 +29,13 @@ development and sanitizer compilers on 2026-09-02. No later stage is active.
 - [x] Verify layout/member edits invalidate consumers while independent packages
   remain reusable, serial/parallel artifacts are byte-identical, and separate
   execution matches whole-project behavior. Complete Rust and shared exit gates.
+
+### Stage 26.5.1: Explicit interface overrides
+
+- [x] Migrate shared implementing declarations to `override`; test missing and
+  unmatched markers against source-free dependencies and inherited methods.
+- [x] Pass both compiler configurations and Rust quality gates, preserving
+  opaque artifacts and existing compatibility/scheduling protocols.
 
 ### Stage 25: Enum artifact compatibility
 
