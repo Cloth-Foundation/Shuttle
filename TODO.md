@@ -6,7 +6,7 @@ in owning contracts rather than only recorded as completed checkboxes.
 
 ## Stage status
 
-Stages 22 and 23 are complete. Stage 24 is active. Shared verification is
+Stages 22, 23, and 24 are complete. Shared verification is
 documented in `docs/testing.md`.
 
 ## Scheduled work
@@ -54,7 +54,7 @@ documented in `docs/testing.md`.
 - [x] **24.3 — Validated local reuse.** Persist conservative package input
   fingerprints and reuse artifacts only after integrity and compatibility
   validation, with precise dependent invalidation and atomic state updates.
-- [ ] **24.4 — Parallel scheduling and exit audit.** Bound concurrent ready
+- [x] **24.4 — Parallel scheduling and exit audit.** Bound concurrent ready
   packages, preserve deterministic output/diagnostics, and close all shared
   performance and correctness gates.
 

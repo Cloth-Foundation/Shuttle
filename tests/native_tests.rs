@@ -254,10 +254,15 @@ fn relocated_native_builds_are_byte_identical() {
     let first = Fixture::new();
     let second = Fixture::new();
     let executable = format!("app/target/x86_64/app{}", std::env::consts::EXE_SUFFIX);
-    expect_status(&run(&mut first.shuttle("build", &compiler())), 0);
+    let selected_compiler = compiler();
+    let mut serial = first.shuttle("build", &selected_compiler);
+    serial.args(["--jobs", "1"]);
+    expect_status(&run(&mut serial), 0);
     // Cross a PE timestamp boundary to detect wall-clock-dependent link output.
     std::thread::sleep(std::time::Duration::from_millis(1100));
-    expect_status(&run(&mut second.shuttle("build", &compiler())), 0);
+    let mut parallel = second.shuttle("build", &selected_compiler);
+    parallel.args(["--jobs", "4"]);
+    expect_status(&run(&mut parallel), 0);
     assert!(
         fs::read(first.root.join(&executable)).expect("first binary")
             == fs::read(second.root.join(&executable)).expect("second binary"),

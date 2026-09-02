@@ -36,6 +36,7 @@ access registries, select build profiles, or apply workspace policy.
 - [Cloth package artifact contract](../docs/proposals/stage_23_artifacts.md)
 - [Build execution and progress](docs/build_execution.md)
 - [Stage 24 local artifact reuse](docs/proposals/stage_24_reuse.md)
+- [Stage 24 bounded parallel scheduling](docs/proposals/stage_24_parallel.md)
 - [Implementation language](docs/implementation_language.md)
 
 ## Build and test
@@ -63,7 +64,7 @@ For a local Cloth project and compiler checkout:
 cargo run --locked -- check --manifest-path ../examples/Shuttle.toml \
   --compiler ../build/dev/clothc
 cargo run --locked -- run --manifest-path ../examples/Shuttle.toml \
-  --compiler ../build/dev/clothc
+  --compiler ../build/dev/clothc --jobs 4
 ```
 
 `check` keeps validated interface artifacts under
@@ -73,12 +74,13 @@ the root package. Local state is scoped to each target and artifact kind.
 
 ## Status
 
-Stage 23 is complete and Stage 24 is active. Local projects, recursive local
+Stages 23 and 24 are complete. Local projects, recursive local
 dependencies, and `check`, `build`, and `run` use compiler protocol version 2
 for deterministic separate compilation and linking. Protocol version 1 remains
 available to older clients and explicit compiler tests. Unchanged local package
-artifacts are reused only after compiler-owned validation; remote dependencies
-and registries are not implemented.
+artifacts are reused only after compiler-owned validation, and independent ready
+packages run under a bounded deterministic scheduler. Remote dependencies and
+registries are not implemented.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.

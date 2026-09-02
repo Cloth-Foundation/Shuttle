@@ -367,6 +367,37 @@ fn forwards_utf8_source_diagnostics_without_rewriting_them() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST"]
+fn parallel_and_single_job_diagnostics_are_identical() {
+    let fixture = Fixture::named("parallel diagnostic equivalence");
+    fixture.write(
+        "models/src/Broken.co",
+        "static func Broken() { missingModel(); }\n",
+    );
+    fixture.write(
+        "tools/src/Broken.co",
+        "static func Broken() { missingTool(); }\n",
+    );
+    let selected_compiler = compiler();
+    let mut serial = fixture.shuttle("check", &selected_compiler);
+    serial.args(["--jobs", "1"]);
+    let serial = run(&mut serial);
+    expect_status(&serial, 1);
+
+    let mut parallel = fixture.shuttle("check", &selected_compiler);
+    parallel.args(["--jobs", "2"]);
+    let parallel = run(&mut parallel);
+    expect_status(&parallel, 1);
+    assert!(serial.stdout.is_empty() && parallel.stdout.is_empty());
+    assert_eq!(serial.stderr, parallel.stderr);
+    assert!(
+        String::from_utf8(parallel.stderr)
+            .expect("parallel diagnostic")
+            .contains("missingModel")
+    );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
 fn separate_and_whole_project_diagnostic_categories_are_equivalent() {
     let fixture = Fixture::from_fixture("equivalence_graph", "diagnostic equivalence");
     fixture.write(

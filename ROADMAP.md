@@ -13,7 +13,7 @@ criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
 Stage 22 is complete, including the shared process, native, and sanitizer
-verification. Stage 23 is also complete. Stage 24 is active.
+verification. Stages 23 and 24 are also complete.
 
 ## Stage 22: Local projects and compiler build protocol
 
@@ -100,7 +100,7 @@ Exit criteria:
 
 ## Stage 24: Responsive and observable local builds
 
-Status: **active**
+Status: **complete**
 
 Objective: make local builds visibly active, accelerate clean builds at measured
 bottlenecks, and reuse unchanged verified package artifacts safely.

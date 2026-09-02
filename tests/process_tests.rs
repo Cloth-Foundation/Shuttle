@@ -33,16 +33,27 @@ fn stub(fixture: &Fixture) -> PathBuf {
 }
 
 fn command(fixture: &Fixture, compiler: &Path, action: &str, mode: &str) -> Command {
-    let mut command = fixture.shuttle(action, compiler);
-    command
-        .env("SHUTTLE_STUB_LOG", fixture.root.join("calls.log"))
-        .env("SHUTTLE_STUB_MODE", mode);
-    command
+    configured_command(fixture, compiler, action, mode, false, 1)
 }
 
 fn visible_command(fixture: &Fixture, compiler: &Path, action: &str, mode: &str) -> Command {
+    configured_command(fixture, compiler, action, mode, true, 1)
+}
+
+fn configured_command(
+    fixture: &Fixture,
+    compiler: &Path,
+    action: &str,
+    mode: &str,
+    visible: bool,
+    jobs: usize,
+) -> Command {
     let mut command = fixture.visible_shuttle(action, compiler);
+    if !visible {
+        command.arg("--quiet");
+    }
     command
+        .args(["--jobs", &jobs.to_string()])
         .env("SHUTTLE_STUB_LOG", fixture.root.join("calls.log"))
         .env("SHUTTLE_STUB_MODE", mode);
     command
@@ -63,6 +74,19 @@ fn compiled_packages(fixture: &Fixture) -> Vec<String> {
         .filter_map(|line| line.strip_prefix("compile:"))
         .map(|line| line.split(':').next().expect("package").to_owned())
         .collect()
+}
+
+fn package_artifacts(fixture: &Fixture) -> Vec<Vec<u8>> {
+    ["foundation", "data-models", "tools", "app"]
+        .map(|package| {
+            fs::read(
+                fixture
+                    .root
+                    .join(format!("app/target/x86_64/packages/{package}.cpa")),
+            )
+            .expect("package artifact")
+        })
+        .into()
 }
 
 #[test]
@@ -210,6 +234,81 @@ fn reports_build_progress_without_contaminating_program_output() {
         );
         previous = position + message.len();
     }
+}
+
+#[test]
+fn bounds_parallel_ready_packages_and_preserves_canonical_results() {
+    let serial = Fixture::named("serial project");
+    let serial_compiler = stub(&serial);
+    let mut serial_command = command(&serial, &serial_compiler, "build", "");
+    expect_status(&run(&mut serial_command), 0);
+
+    let parallel = Fixture::named("parallel project");
+    let parallel_compiler = stub(&parallel);
+    let mut parallel_command = configured_command(
+        &parallel,
+        &parallel_compiler,
+        "build",
+        "parallel-barrier",
+        true,
+        2,
+    );
+    let output = run(&mut parallel_command);
+    expect_status(&output, 0);
+    assert!(parallel.root.join("data-models.ready").is_file());
+    assert!(parallel.root.join("tools.ready").is_file());
+    assert_eq!(package_artifacts(&serial), package_artifacts(&parallel));
+
+    let progress = String::from_utf8(output.stderr).expect("parallel progress");
+    let expected = [
+        "shuttle: scheduling with 2 jobs",
+        "shuttle: compiling foundation v1.0.0 [1/4]",
+        "shuttle: compiling data-models v1.2.3-beta.1+local [2/4]",
+        "shuttle: compiling tools v0.2.0 [3/4]",
+        "shuttle: compiling app v0.1.0 [4/4]",
+    ];
+    let mut previous = 0;
+    for message in expected {
+        let position = progress[previous..].find(message).map_or_else(
+            || panic!("missing {message:?} in {progress:?}"),
+            |position| previous + position,
+        );
+        previous = position + message.len();
+    }
+}
+
+#[test]
+fn parallel_failures_replay_the_same_canonical_diagnostic_as_one_job() {
+    let serial = Fixture::named("serial failure");
+    let serial_compiler = stub(&serial);
+    let mut serial_command = command(&serial, &serial_compiler, "check", "parallel-failure");
+    let serial_output = run(&mut serial_command);
+    expect_status(&serial_output, 1);
+
+    let parallel = Fixture::named("parallel failure");
+    let parallel_compiler = stub(&parallel);
+    let mut parallel_command = configured_command(
+        &parallel,
+        &parallel_compiler,
+        "check",
+        "parallel-failure",
+        false,
+        2,
+    );
+    let parallel_output = run(&mut parallel_command);
+    expect_status(&parallel_output, 1);
+
+    assert_eq!(serial_output.stderr, parallel_output.stderr);
+    assert_eq!(
+        String::from_utf8(parallel_output.stderr)
+            .expect("parallel diagnostic")
+            .replace("\r\n", "\n"),
+        "data-models.co:3:5: error: parallel stub rejection\n"
+    );
+    assert_eq!(compiled_packages(&serial), ["foundation", "data-models"]);
+    let mut parallel_packages = compiled_packages(&parallel);
+    parallel_packages.sort();
+    assert_eq!(parallel_packages, ["data-models", "foundation", "tools"]);
 }
 
 #[test]
