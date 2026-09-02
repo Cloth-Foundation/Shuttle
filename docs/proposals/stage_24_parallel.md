@@ -4,7 +4,8 @@ Status: **implemented; Stage 24.4 completed 2026-09-01**.
 
 This document owns Shuttle's local package concurrency and deterministic output
 contract. It does not change Cloth semantics, compiler protocol version 2, or
-artifact format 1.
+the compiler-owned artifact format. Stage 25 requires format 2; scheduling
+semantics are unchanged.
 
 ## Job policy
 

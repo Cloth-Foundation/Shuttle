@@ -53,6 +53,31 @@ fn whole_project_run(fixture: &Fixture) -> Output {
     run(&mut Command::new(output))
 }
 
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn enums_preserve_native_and_parallel_package_behavior() {
+    let serial = Fixture::enums();
+    let parallel = Fixture::enums();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, b"data-models.State.Ready\ndata-models.State.ready\ndata-models.State._Done\ntrue\ndata-models.State\n");
+    assert_eq!(first.stdout, second.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    for package in ["app", "data-models", "foundation", "tools"] {
+        let path = format!("app/target/x86_64/packages/{package}.cpa");
+        assert_eq!(
+            fs::read(serial.root.join(&path)).unwrap(),
+            fs::read(parallel.root.join(&path)).unwrap()
+        );
+    }
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(first.stdout, whole.stdout);
+}
+
 fn inspect_artifact(path: &Path) -> ArtifactRecord {
     let output = run(Command::new(compiler())
         .args(["--shuttle-protocol", "2", "--operation", "inspect"])

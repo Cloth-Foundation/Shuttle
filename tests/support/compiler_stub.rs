@@ -42,7 +42,7 @@ fn main() {
     let mode = env::var("SHUTTLE_STUB_MODE").unwrap_or_default();
     if query {
         let capabilities = format!(
-            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[1],\"compiler_id\":\"{COMPILER_ID}\",\"operations\":[\"compile\",\"inspect\",\"link\",\"reuse\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
+            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[2],\"compiler_id\":\"{COMPILER_ID}\",\"operations\":[\"compile\",\"inspect\",\"link\",\"reuse\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
         );
         match mode.as_str() {
             "query-version" => println!("{{\"schema\":1,\"protocols\":[1]}}"),
@@ -146,7 +146,7 @@ fn emit_receipt(arguments: &[std::ffi::OsString]) {
         ARTIFACT_ID
     };
     let receipt = format!(
-        "{{\"schema\":1,\"artifact_format\":1,\"artifact_id\":\"{ARTIFACT_ID}\",\"kind\":\"{kind}\",\"package\":{{\"name\":\"{package}\",\"version\":\"{version}\"}},\"target\":\"{target}\",\"compiler_id\":\"{COMPILER_ID}\",\"dependencies\":[{}]}}",
+        "{{\"schema\":1,\"artifact_format\":2,\"artifact_id\":\"{ARTIFACT_ID}\",\"kind\":\"{kind}\",\"package\":{{\"name\":\"{package}\",\"version\":\"{version}\"}},\"target\":\"{target}\",\"compiler_id\":\"{COMPILER_ID}\",\"dependencies\":[{}]}}",
         dependencies.join(",")
     );
     let receipt = receipt.replace(ARTIFACT_ID, artifact_id).replace(

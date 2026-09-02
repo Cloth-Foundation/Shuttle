@@ -21,6 +21,14 @@ impl Fixture {
         Self::from_fixture("local_graph", name)
     }
 
+    pub fn enums() -> Self {
+        let fixture = Self::new();
+        fixture.write("models/src/State.co", "enum { Ready, ready, _Done }\n");
+        fixture.write("models/src/StateReader.co", "State Value;\nStateReader(State value) { Value = value; }\nfunc Read(): State { return Value; }\nstatic final State Initial = State.ready;\n");
+        fixture.write("app/src/Main.co", "import models::State as JobState;\nimport models::StateReader;\nstatic func Main() {\n  JobState[] values = [JobState.Ready, StateReader.Initial, JobState._Done];\n  for (var value in values) { println(value); }\n  StateReader reader = StateReader(JobState._Done);\n  println(reader.Read() == JobState._Done);\n  println(reader.Read()::typeName);\n}\n");
+        fixture
+    }
+
     pub fn from_fixture(fixture: &str, name: &str) -> Self {
         let directory = TempDir::new().expect("create fixture directory");
         let root = directory.path().join(name);

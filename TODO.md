@@ -6,10 +6,17 @@ in owning contracts rather than only recorded as completed checkboxes.
 
 ## Stage status
 
-Stages 22, 23, and 24 are complete. Shared verification is
+Stages 22 through 25 are complete. Shared verification is
 documented in `docs/testing.md`.
 
 ## Scheduled work
+
+### Stage 25: Enum artifact compatibility
+
+- [x] Require compiler-owned artifact format 2 in capabilities and receipts;
+  retain process protocol v2, opaque artifact handling, and conservative reuse.
+- [x] Verify enum dependency builds, source-free consumption, case-edit
+  invalidation, and serial/parallel equivalence in the shared toolchain suites.
 
 ### Stage 22: Local projects and compiler build protocol
 

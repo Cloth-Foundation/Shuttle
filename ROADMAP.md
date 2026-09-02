@@ -15,6 +15,30 @@ explicit implementation go-ahead.
 Stage 22 is complete, including the shared process, native, and sanitizer
 verification. Stages 23 and 24 are also complete.
 
+## Stage 25: Enum artifact compatibility
+
+Status: **complete**
+
+Completed on 2026-09-02 with the coordinated compiler/Rust audit recorded in
+[`docs/testing.md`](docs/testing.md#stage-25-enum-exit-audit).
+
+Objective: support Cloth's approved named-enum stage through compiler artifact
+format 2 without importing language semantics into Shuttle.
+
+Prerequisite: completed Stage 24. The compiler's Stage 25 implementation
+authorization includes this coordinated compatibility work.
+
+Deliverables: validate format-2 capabilities/receipts, update protocol fixtures,
+and verify enum builds, dependency reuse/invalidation, and whole-project versus
+separate and serial versus parallel equivalence.
+
+Non-goals: manifest or process-protocol changes, artifact deserialization,
+remote dependencies, and additional build-system features.
+
+Exit criteria: format mismatches fail deterministically; source-free enum
+consumption and case-edit invalidation pass; Rust and shared compiler native,
+development, and sanitizer suites pass.
+
 ## Stage 22: Local projects and compiler build protocol
 
 Status: **complete**

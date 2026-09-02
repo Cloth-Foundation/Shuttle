@@ -27,7 +27,7 @@ It accepts no other argument and returns one UTF-8 JSON object plus LF, empty
 stderr, and status 0:
 
 ```json
-{"schema":1,"protocols":[1,2],"artifact_formats":[1],"compiler_id":"<64 lowercase hex digits>","operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
+{"schema":1,"protocols":[1,2],"artifact_formats":[2],"compiler_id":"<64 lowercase hex digits>","operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
 ```
 
 The digest placeholder represents the artifact contract's actual compiler
@@ -36,10 +36,16 @@ optional native tools are installed. Interface checking must work without
 them. Compiler/native-tool discovery failures are diagnosed only when the
 requested operation needs those tools.
 
-New Shuttle requires protocol 2 and artifact format 1 for this workflow. A
+Shuttle requires protocol 2 and artifact format 2 for this workflow. A
 missing/malformed query or unsupported required capability fails clearly;
 there is no silent fallback to a whole-project build. Old clients retain v1.
 Tests invoke v1 explicitly as the equivalence oracle.
+
+Stage 25 updates the artifact requirement from format 1 to format 2 for enums
+and compiler ABI 3. This is a coordinated artifact compatibility change, not a
+new Shuttle build system, manifest format, or process protocol. Old artifacts
+must be rebuilt; their semantic schema is owned by the compiler's
+[artifact schema v2](../../../docs/artifact_schema_v2.md).
 
 Stage 24 adds `reuse` to this capability set. Its current-input validation,
 cache-miss status, and persistent-state rules are owned by
@@ -149,7 +155,7 @@ stdout. The object has these required fields, with no omitted fields:
 ```json
 {
   "schema": 1,
-  "artifact_format": 1,
+  "artifact_format": 2,
   "artifact_id": "<64 lowercase hex digits>",
   "kind": "object",
   "package": {"name": "models", "version": "0.1.0"},
