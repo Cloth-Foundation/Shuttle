@@ -40,6 +40,14 @@ fn command(fixture: &Fixture, compiler: &Path, action: &str, mode: &str) -> Comm
     command
 }
 
+fn visible_command(fixture: &Fixture, compiler: &Path, action: &str, mode: &str) -> Command {
+    let mut command = fixture.visible_shuttle(action, compiler);
+    command
+        .env("SHUTTLE_STUB_LOG", fixture.root.join("calls.log"))
+        .env("SHUTTLE_STUB_MODE", mode);
+    command
+}
+
 fn phases(fixture: &Fixture) -> Vec<String> {
     fs::read_to_string(fixture.root.join("calls.log"))
         .expect("calls log")
@@ -111,7 +119,10 @@ fn rejects_malformed_or_mismatched_compile_receipts() {
         expect_status(&output, 2);
         assert!(output.stdout.is_empty());
         assert!(!phases(&fixture).iter().any(|phase| phase == "link"));
-        assert!(!fixture.root.join("app/target").exists());
+        let state = fixture.root.join("app/target/x86_64/check/.shuttle/state");
+        let state_is_empty =
+            fs::read_dir(state).map_or(true, |mut entries| entries.next().is_none());
+        assert!(state_is_empty);
     }
 }
 
@@ -168,32 +179,156 @@ fn runs_only_after_success_and_forwards_program_streams_and_status() {
 }
 
 #[test]
-fn rejects_a_concurrent_writer_for_the_same_target() {
+fn reports_build_progress_without_contaminating_program_output() {
     let fixture = Fixture::new();
     let compiler = stub(&fixture);
-    let mut first = command(&fixture, &compiler, "build", "compile-wait");
-    let child = first
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("start first build");
-    let start = Instant::now();
-    while !fs::read_to_string(fixture.root.join("calls.log"))
-        .is_ok_and(|log| log.contains("compile:"))
-    {
-        assert!(start.elapsed() < Duration::from_secs(10));
-        thread::sleep(Duration::from_millis(10));
+    let output = run(&mut visible_command(&fixture, &compiler, "run", ""));
+    expect_status(&output, 7);
+    assert_eq!(
+        String::from_utf8(output.stdout)
+            .expect("program stdout")
+            .replace("\r\n", "\n"),
+        "program\n"
+    );
+    let progress = String::from_utf8(output.stderr).expect("progress");
+    let expected = [
+        "shuttle: preparing build for x86_64 (4 packages)",
+        "shuttle: compiling foundation v1.0.0 [1/4]",
+        "shuttle: compiling data-models v1.2.3-beta.1+local [2/4]",
+        "shuttle: compiling tools v0.2.0 [3/4]",
+        "shuttle: compiling app v0.1.0 [4/4]",
+        "shuttle: linking app",
+        "shuttle: finished build for x86_64 in ",
+        "shuttle: running ",
+        "program stderr",
+    ];
+    let mut previous = 0;
+    for message in expected {
+        let position = progress[previous..].find(message).map_or_else(
+            || panic!("missing {message:?} in {progress:?}"),
+            |position| previous + position,
+        );
+        previous = position + message.len();
     }
+}
+
+#[test]
+fn reuses_every_unchanged_package_and_reports_validation() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    let first = run(&mut command(&fixture, &compiler, "build", ""));
+    expect_status(&first, 0);
+    fs::remove_file(fixture.root.join("calls.log")).expect("reset call log");
+
+    let second = run(&mut visible_command(&fixture, &compiler, "build", ""));
+    expect_status(&second, 0);
+    assert_eq!(
+        phases(&fixture),
+        ["query", "reuse", "reuse", "reuse", "reuse", "link"]
+    );
+    assert!(compiled_packages(&fixture).is_empty());
+    let progress = String::from_utf8(second.stderr).expect("progress");
+    for package in ["foundation", "data-models", "tools", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: validating {package} "))
+                && progress.contains(&format!("shuttle: reusing {package} ")),
+            "missing reuse progress for {package}: {progress}"
+        );
+    }
+    assert!(!progress.contains("shuttle: compiling"));
+}
+
+#[test]
+fn manifest_only_invalidation_stops_at_an_identical_artifact() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    let first = run(&mut command(&fixture, &compiler, "build", ""));
+    expect_status(&first, 0);
+
+    let manifest = fixture.root.join("core/Shuttle.toml");
+    let mut contents = fs::read_to_string(&manifest).expect("foundation manifest");
+    contents.push_str("\n# exact manifest snapshot changed\n");
+    fs::write(manifest, contents).expect("change foundation manifest");
+    fs::remove_file(fixture.root.join("calls.log")).expect("reset call log");
 
     let second = run(&mut command(&fixture, &compiler, "build", ""));
-    expect_status(&second, 2);
-    assert!(
-        String::from_utf8(second.stderr)
-            .expect("lock diagnostic")
-            .contains("owns")
+    expect_status(&second, 0);
+    assert_eq!(compiled_packages(&fixture), ["foundation"]);
+    assert_eq!(
+        phases(&fixture),
+        ["query", "compile", "reuse", "reuse", "reuse", "link"]
     );
-    let first_output = child.wait_with_output().expect("finish first build");
-    expect_status(&first_output, 0);
+}
+
+#[test]
+fn malformed_local_state_is_ignored_without_invalidating_consumers() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    let first = run(&mut command(&fixture, &compiler, "build", ""));
+    expect_status(&first, 0);
+
+    let state_directory = fixture
+        .root
+        .join("app/target/x86_64/.shuttle/state/foundation");
+    let states = fs::read_dir(&state_directory)
+        .expect("foundation state directory")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("foundation state entries");
+    assert_eq!(states.len(), 1);
+    assert_eq!(
+        states[0]
+            .path()
+            .extension()
+            .and_then(|value| value.to_str()),
+        Some("json")
+    );
+    fs::write(states[0].path(), b"{not valid state").expect("corrupt local state");
+    fs::remove_file(fixture.root.join("calls.log")).expect("reset call log");
+
+    let second = run(&mut command(&fixture, &compiler, "build", ""));
+    expect_status(&second, 0);
+    assert_eq!(compiled_packages(&fixture), ["foundation"]);
+    assert_eq!(
+        phases(&fixture),
+        ["query", "compile", "reuse", "reuse", "reuse", "link"]
+    );
+    assert_eq!(
+        fs::read_dir(state_directory)
+            .expect("repaired state directory")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn rejects_a_concurrent_writer_for_the_same_target() {
+    for action in ["build", "check"] {
+        let fixture = Fixture::new();
+        let compiler = stub(&fixture);
+        let mut first = command(&fixture, &compiler, action, "compile-wait");
+        let child = first
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("start first build");
+        let start = Instant::now();
+        while !fs::read_to_string(fixture.root.join("calls.log"))
+            .is_ok_and(|log| log.contains("compile:"))
+        {
+            assert!(start.elapsed() < Duration::from_secs(10));
+            thread::sleep(Duration::from_millis(10));
+        }
+
+        let second = run(&mut command(&fixture, &compiler, action, ""));
+        expect_status(&second, 2);
+        assert!(
+            String::from_utf8(second.stderr)
+                .expect("lock diagnostic")
+                .contains("owns")
+        );
+        let first_output = child.wait_with_output().expect("finish first build");
+        expect_status(&first_output, 0);
+    }
 }
 
 #[test]

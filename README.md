@@ -34,6 +34,8 @@ access registries, select build profiles, or apply workspace policy.
 - [Shuttle-to-`clothc` protocol version 1](docs/compiler_protocol.md)
 - [Shuttle-to-`clothc` protocol version 2](docs/proposals/compiler_protocol_v2.md)
 - [Cloth package artifact contract](../docs/proposals/stage_23_artifacts.md)
+- [Build execution and progress](docs/build_execution.md)
+- [Stage 24 local artifact reuse](docs/proposals/stage_24_reuse.md)
 - [Implementation language](docs/implementation_language.md)
 
 ## Build and test
@@ -64,18 +66,19 @@ cargo run --locked -- run --manifest-path ../examples/Shuttle.toml \
   --compiler ../build/dev/clothc
 ```
 
-`check` uses temporary interface artifacts and leaves no build output. `build`
-and `run` place independently compiled package artifacts under
-`target/x86_64/packages/` and the native executable under
-`target/x86_64/` in the root package.
+`check` keeps validated interface artifacts under
+`target/TARGET/check/packages/`. `build` and `run` keep object artifacts under
+`target/x86_64/packages/` and the native executable under `target/x86_64/` in
+the root package. Local state is scoped to each target and artifact kind.
 
 ## Status
 
-Stage 23 is complete. Local projects, recursive local dependencies, and
-`check`, `build`, and `run` use compiler protocol version 2 for deterministic
-separate compilation and linking. Protocol version 1 remains available to older
-clients and explicit compiler tests. Automatic artifact reuse across commands,
-remote dependencies, and registries are not implemented.
+Stage 23 is complete and Stage 24 is active. Local projects, recursive local
+dependencies, and `check`, `build`, and `run` use compiler protocol version 2
+for deterministic separate compilation and linking. Protocol version 1 remains
+available to older clients and explicit compiler tests. Unchanged local package
+artifacts are reused only after compiler-owned validation; remote dependencies
+and registries are not implemented.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.

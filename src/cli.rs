@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use clap::{Args, Parser, Subcommand};
 
 use crate::compiler::{
-    ProjectCommand, Target, execute_graph, select_compiler, validate_project_command,
+    ProgressMode, ProjectCommand, Target, execute_graph, select_compiler, validate_project_command,
 };
 use crate::diagnostic::Diagnostic;
 use crate::graph::resolve_package_graph;
@@ -47,6 +47,10 @@ struct ProjectOptions {
     /// Select the Cloth compilation target.
     #[arg(long, value_enum, default_value_t = Target::X86_64)]
     target: Target,
+
+    /// Suppress successful build progress.
+    #[arg(long)]
+    quiet: bool,
 }
 
 #[derive(Debug)]
@@ -90,7 +94,12 @@ pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure>
                 diagnostics: vec![diagnostic],
             }
         })?;
-    execute_graph(&compiler, &graph, project_command, options.target).map_err(|failure| {
+    let progress = if options.quiet {
+        ProgressMode::Quiet
+    } else {
+        ProgressMode::Visible
+    };
+    execute_graph(&compiler, &graph, project_command, options.target, progress).map_err(|failure| {
         CommandFailure {
             exit_code: failure.exit_code,
             diagnostics: failure

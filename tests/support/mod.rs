@@ -47,6 +47,12 @@ impl Fixture {
     }
 
     pub fn shuttle(&self, command: &str, compiler: &Path) -> Command {
+        let mut process = self.visible_shuttle(command, compiler);
+        process.arg("--quiet");
+        process
+    }
+
+    pub fn visible_shuttle(&self, command: &str, compiler: &Path) -> Command {
         let mut process = Command::new(env!("CARGO_BIN_EXE_shuttle"));
         process
             .current_dir(&self.root)

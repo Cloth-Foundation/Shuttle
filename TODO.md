@@ -6,8 +6,8 @@ in owning contracts rather than only recorded as completed checkboxes.
 
 ## Stage status
 
-Stages 22 and 23 are complete. No later Shuttle stage is active. Shared
-verification is documented in `docs/testing.md`.
+Stages 22 and 23 are complete. Stage 24 is active. Shared verification is
+documented in `docs/testing.md`.
 
 ## Scheduled work
 
@@ -43,6 +43,20 @@ verification is documented in `docs/testing.md`.
 - [x] **23.4 — Equivalence verification.** Prove clean and reused builds match
   whole-project behavior, then close the shared integration and Shuttle exit
   audits.
+
+### Stage 24: Responsive and observable local builds
+
+- [x] **24.1 — Progress and measurement.** Define and implement stable stderr
+  progress plus repeatable phase baselines without altering compiler diagnostic
+  or executed-program streams.
+- [x] **24.2 — Cold-path efficiency.** Remove profiled identity and process
+  overhead while retaining exact compiler and native-tool compatibility.
+- [x] **24.3 — Validated local reuse.** Persist conservative package input
+  fingerprints and reuse artifacts only after integrity and compatibility
+  validation, with precise dependent invalidation and atomic state updates.
+- [ ] **24.4 — Parallel scheduling and exit audit.** Bound concurrent ready
+  packages, preserve deterministic output/diagnostics, and close all shared
+  performance and correctness gates.
 
 ## Unscheduled backlog
 

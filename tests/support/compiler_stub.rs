@@ -27,7 +27,7 @@ fn main() {
         .create(true)
         .open(env::var_os("SHUTTLE_STUB_LOG").expect("stub log"))
         .expect("open log");
-    let detail = if phase == "compile" {
+    let detail = if matches!(phase, "compile" | "reuse") {
         package_name(&arguments).unwrap_or_default()
     } else {
         String::new()
@@ -41,7 +41,7 @@ fn main() {
     let mode = env::var("SHUTTLE_STUB_MODE").unwrap_or_default();
     if query {
         let capabilities = format!(
-            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[1],\"compiler_id\":\"{COMPILER_ID}\",\"operations\":[\"compile\",\"inspect\",\"link\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
+            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[1],\"compiler_id\":\"{COMPILER_ID}\",\"operations\":[\"compile\",\"inspect\",\"link\",\"reuse\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
         );
         match mode.as_str() {
             "query-version" => println!("{{\"schema\":1,\"protocols\":[1]}}"),
@@ -70,6 +70,11 @@ fn main() {
     }
     if phase == "compile" {
         compile(&arguments);
+    } else if phase == "reuse" {
+        if mode == "reuse-miss" {
+            std::process::exit(3);
+        }
+        emit_receipt(&arguments);
     } else if phase == "link" {
         link(&arguments);
     }
@@ -78,6 +83,10 @@ fn main() {
 fn compile(arguments: &[std::ffi::OsString]) {
     let output = PathBuf::from(option(arguments, "--output").expect("output"));
     fs::write(&output, b"stub artifact").expect("create artifact");
+    emit_receipt(arguments);
+}
+
+fn emit_receipt(arguments: &[std::ffi::OsString]) {
     let package_index = arguments
         .iter()
         .position(|argument| argument == "--package")

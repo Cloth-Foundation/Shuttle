@@ -19,6 +19,7 @@ const LEGACY_MANIFEST_FILENAME: &str = "cloth.toml";
 pub struct Manifest {
     pub path: PathBuf,
     pub package_root: PathBuf,
+    pub contents: String,
     pub package: Package,
     pub executable: Option<Executable>,
     pub dependencies: BTreeMap<String, Dependency>,
@@ -265,6 +266,7 @@ fn validate_manifest(
         Ok(Manifest {
             path: manifest_path,
             package_root,
+            contents: source.to_owned(),
             package: package.expect("a valid manifest has a package"),
             executable,
             dependencies,

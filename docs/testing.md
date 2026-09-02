@@ -11,9 +11,10 @@ cargo +1.85.0 check --all-targets --locked
 
 These tests cover schema validation, portable paths, discovery, graph ordering,
 cycles, duplicate identities, request construction, compiler selection, and
-process status/stream handling. The process tests compile a test-only Rust
-compiler stub with `rustc`; they never use shell scripts or mutate the parent
-process environment.
+process status/stream handling. They also verify default progress ordering,
+quiet mode, and standard-output isolation. The process tests compile a test-only
+Rust compiler stub with `rustc`; they never use shell scripts or mutate the
+parent process environment.
 
 ## Real compiler tests
 
@@ -68,3 +69,48 @@ The coordinated GNU development and Clang ASan/UBSan runs each pass all 92
 CTest entries, including all 14 protocol and seven native cases. Rust format,
 Clippy with warnings denied, all 36 ordinary tests, and the Rust 1.85 baseline
 also pass. Stage 23 is complete; automatic cache reuse remains deferred.
+
+## Stage 24.2 responsiveness checkpoint
+
+Verified on Windows on 2026-09-01 with a release Shuttle executable and the GNU
+development compiler. The one-package `examples/Shuttle.toml` `wasm32` check is
+the repeatable cold-path benchmark; `--quiet` excludes terminal rendering while
+retaining the same compilation path. Its initial observed time was 9.35 seconds.
+After optimizing exact executable hashing and sized binary reads, five warm-file
+system runs measured 216.3, 161.9, 154.6, 158.4, and 162.0 milliseconds. The
+median is 161.9 milliseconds, a 98.3% reduction from the initial observation.
+
+The compiler capability query accounted for 5.86 seconds of the initial run.
+Its five corresponding post-change runs measured 82.9, 70.2, 66.1, 68.5, and
+70.3 milliseconds, with a 70.2-millisecond median. SHA-256 values and all exact
+compiler, runtime, native-tool, source, and dependency identities are unchanged.
+
+The checkpoint passes all 92 development and all 92 sanitizer CTest entries,
+all 37 ordinary Shuttle tests, Rust formatting, Clippy with warnings denied,
+the Rust 1.85 baseline, C++ formatting, and repository whitespace checks.
+At this checkpoint, validated unchanged-package reuse and deterministic parallel
+scheduling remained the active Stage 24.3 and 24.4 work.
+
+## Stage 24.3 reuse checkpoint
+
+Verified on Windows on 2026-09-01 with the GNU development compiler and the
+Clang/MSVC-library ASan/UBSan compiler:
+
+- unchanged interface and object builds validate and reuse every package with
+  no package compilation;
+- exact manifest changes invalidate their package, while an unchanged artifact
+  digest stops downstream invalidation;
+- source changes invalidate every consumer reached through changed dependency
+  digests, while target and compiler changes reject all incompatible entries;
+- runtime and native-tool identities remain exact compatibility gates, and a
+  corrupt candidate is rebuilt without invalidating consumers when the repaired
+  artifact is byte-identical;
+- malformed local state is an ordinary miss, immutable state publication leaves
+  one current record, and both interface and object workspaces reject concurrent
+  writers; and
+- all 92 development and 92 sanitizer CTest entries pass, including 17 shared
+  protocol and eight native cases. All 40 ordinary Shuttle tests, Rust 1.85,
+  Rust formatting and Clippy, C++ formatting, and whitespace checks pass.
+
+Stage 24.3 is complete. Deterministic bounded parallel scheduling remains the
+active Stage 24.4 work.

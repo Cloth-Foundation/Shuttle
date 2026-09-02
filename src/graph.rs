@@ -17,6 +17,7 @@ pub struct PackageRecord {
     pub name: String,
     pub version: Version,
     pub manifest_path: PathBuf,
+    pub manifest_contents: String,
     pub package_root: PathBuf,
     pub source_root: PathBuf,
 }
@@ -241,6 +242,7 @@ fn package_record(loaded_package: LoadedPackage) -> (String, PackageRecord) {
             name,
             version: manifest.package.version,
             manifest_path: loaded_package.canonical_manifest_path,
+            manifest_contents: manifest.contents,
             package_root: manifest.package_root,
             source_root: manifest.package.source_root,
         },

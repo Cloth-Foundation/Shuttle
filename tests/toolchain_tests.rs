@@ -7,7 +7,8 @@
 mod support;
 
 use std::ffi::OsString;
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -122,6 +123,29 @@ fn compile_interface(
     }
 }
 
+fn reuse_interface_arguments(
+    fixture: &Fixture,
+    artifact: &ProtocolArtifact,
+    source_root: &str,
+) -> Vec<OsString> {
+    vec![
+        "--shuttle-protocol".into(),
+        "2".into(),
+        "--operation".into(),
+        "reuse".into(),
+        "--target".into(),
+        "wasm32".into(),
+        "--artifact-kind".into(),
+        "interface".into(),
+        "--input".into(),
+        artifact.path.clone().into_os_string(),
+        "--package".into(),
+        artifact.name.clone().into(),
+        artifact.version.clone().into(),
+        fixture.root.join(source_root).into_os_string(),
+    ]
+}
+
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST"]
 fn capability_query_has_exact_streams_and_rejects_extra_arguments() {
@@ -132,6 +156,33 @@ fn capability_query_has_exact_streams_and_rejects_extra_arguments() {
     let output = run(Command::new(compiler()).args(["--shuttle-protocol-version", "extra"]));
     expect_status(&output, 2);
     assert!(output.stdout.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn reuse_operation_returns_an_exact_receipt_or_a_clean_cache_miss() {
+    let fixture = Fixture::new();
+    let foundation = compile_interface(
+        &fixture,
+        ("foundation", "1.0.0", "core/src"),
+        None,
+        &[],
+        &[],
+    );
+    let arguments = reuse_interface_arguments(&fixture, &foundation, "core/src");
+    let hit = invoke(&fixture, &arguments);
+    expect_status(&hit, 0);
+    assert!(hit.stderr.is_empty());
+    let receipt: ArtifactReceipt = serde_json::from_slice(&hit.stdout).expect("reuse receipt");
+    assert_eq!(receipt.artifact_id, foundation.digest);
+
+    let source = fixture.root.join("core/src/data/Record.co");
+    let mut contents = fs::read_to_string(&source).expect("foundation source");
+    contents.push_str("\n// changed after artifact publication\n");
+    fs::write(source, contents).expect("change foundation source");
+    let miss = invoke(&fixture, &arguments);
+    expect_status(&miss, 3);
+    assert!(miss.stdout.is_empty() && miss.stderr.is_empty());
 }
 
 #[test]
@@ -151,7 +202,17 @@ fn checks_the_complete_graph_and_a_library_without_artifacts() {
         .arg("--compiler")
         .arg(compiler()));
     expect_status(&output, 0);
-    for package in ["app", "models", "tools", "core"] {
+    let check_artifacts = fs::read_dir(fixture.root.join("app/target/wasm32/check/packages"))
+        .expect("persistent check artifacts")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("check artifact entries");
+    assert_eq!(check_artifacts.len(), 4);
+    let library_artifacts = fs::read_dir(fixture.root.join("tools/target/x86_64/check/packages"))
+        .expect("library check artifacts")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("library artifact entries");
+    assert_eq!(library_artifacts.len(), 2);
+    for package in ["models", "core"] {
         assert!(!fixture.root.join(package).join("target").exists());
     }
 }
@@ -174,8 +235,95 @@ fn check_validates_the_selected_executable_signature_without_emission() {
                 .expect("diagnostic")
                 .contains("Main")
         );
-        assert!(!fixture.root.join("app/target").exists());
+        assert!(
+            !fixture
+                .root
+                .join(format!(
+                    "app/target/x86_64/app{}",
+                    std::env::consts::EXE_SUFFIX
+                ))
+                .exists()
+        );
     }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn check_reuses_unchanged_artifacts_and_invalidates_source_dependents() {
+    let fixture = Fixture::new();
+    let selected_compiler = compiler();
+    let first = run(fixture
+        .shuttle("check", &selected_compiler)
+        .args(["--target", "wasm32"]));
+    expect_status(&first, 0);
+
+    let second = run(fixture
+        .visible_shuttle("check", &selected_compiler)
+        .args(["--target", "wasm32"]));
+    expect_status(&second, 0);
+    assert!(second.stdout.is_empty());
+    let progress = String::from_utf8(second.stderr).expect("reuse progress");
+    for package in ["foundation", "data-models", "tools", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: reusing {package} ")),
+            "missing reuse for {package}: {progress}"
+        );
+    }
+    assert!(!progress.contains("shuttle: checking"));
+
+    let source = fixture.root.join("core/src/data/Record.co");
+    let mut contents = fs::read_to_string(&source).expect("foundation source");
+    contents.push_str("\n// invalidate the exact source digest\n");
+    fs::write(source, contents).expect("change foundation source");
+    let changed = run(fixture
+        .visible_shuttle("check", &selected_compiler)
+        .args(["--target", "wasm32"]));
+    expect_status(&changed, 0);
+    let progress = String::from_utf8(changed.stderr).expect("invalidation progress");
+    for package in ["foundation", "data-models", "tools", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: checking {package} ")),
+            "dependency invalidation did not reach {package}: {progress}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn check_separates_targets_and_invalidates_a_changed_compiler() {
+    let fixture = Fixture::new();
+    let selected_compiler = compiler();
+    expect_status(
+        &run(fixture
+            .shuttle("check", &selected_compiler)
+            .args(["--target", "wasm32"])),
+        0,
+    );
+    let x86 = run(fixture
+        .visible_shuttle("check", &selected_compiler)
+        .args(["--target", "x86_64"]));
+    expect_status(&x86, 0);
+    let progress = String::from_utf8(x86.stderr).expect("target progress");
+    assert_eq!(progress.matches("shuttle: checking").count(), 4);
+    assert!(!progress.contains("shuttle: reusing"));
+
+    let changed_compiler = fixture
+        .root
+        .join(format!("changed-clothc{}", std::env::consts::EXE_SUFFIX));
+    fs::copy(&selected_compiler, &changed_compiler).expect("copy compiler");
+    OpenOptions::new()
+        .append(true)
+        .open(&changed_compiler)
+        .expect("open compiler copy")
+        .write_all(b"stage-24-compiler-identity")
+        .expect("change compiler identity");
+    let changed = run(fixture
+        .visible_shuttle("check", &changed_compiler)
+        .args(["--target", "wasm32"]));
+    expect_status(&changed, 0);
+    let progress = String::from_utf8(changed.stderr).expect("compiler progress");
+    assert_eq!(progress.matches("shuttle: checking").count(), 4);
+    assert!(!progress.contains("shuttle: reusing"));
 }
 
 #[test]
