@@ -13,14 +13,19 @@ criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
 Stage 22 is complete, including the shared process, native, and sanitizer
-verification. Stages 23 through 25 are also complete. Stage 26 coordination is
-active: the approved 26.3 compatibility transition and source-free aggregate
-tests are implemented. Stage 26.4 remains the coordinated equivalence and exit
-audit; the compiler roadmap owns the language and ABI contracts.
+verification. Stages 23 through 26 are also complete, including the approved
+aggregate compatibility transition and the coordinated equivalence and exit
+audit. The compiler roadmap owns the language and ABI contracts; no later
+Shuttle stage is activated by this completion.
 
 ## Stage 26: Aggregate artifact compatibility
 
-Status: **active — 26.3 compatibility complete; 26.4 exit audit pending**
+Status: **complete — coordinated 26.4 exit audit passed 2026-09-02**
+
+The [exit audit](docs/testing.md#stage-264-struct-exit-audit) verifies relocated
+serial/parallel artifacts and executables, private-layout/member invalidation,
+unrelated-package reuse, source-free aggregate calls and privacy, whole-project
+equivalence, and both compiler configurations with the Rust quality gates.
 
 Objective: support the compiler-owned struct artifact/ABI transition and prove
 aggregate behavior across the existing separate-compilation boundary.

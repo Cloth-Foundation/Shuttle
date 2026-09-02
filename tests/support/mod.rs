@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -11,6 +12,8 @@ pub struct Fixture {
     _directory: TempDir,
     pub root: PathBuf,
 }
+
+pub const STRUCT_OUTPUT: &[u8] = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n100\n101\n104\ninitial\n";
 
 impl Fixture {
     pub fn new() -> Self {
@@ -48,16 +51,18 @@ impl Fixture {
         let fixture = Self::new();
         fixture.write(
             "models/src/Data.co",
-            r"
+            r#"
 struct {
   byte tag = 1;
   string Text;
   uint64 CountTo;
   Data(string text, uint64 countTo) { Text = text; CountTo = countTo; }
+  _Data(uint64 countTo) { Text = "private"; CountTo = countTo; }
   func Copy(): Data { return self; }
+  func hidden(): uint64 { return CountTo; }
   static func Change(Data data): Data { data.CountTo += 1; return data; }
 }
-",
+"#,
         );
         fixture.write(
             "models/src/Packet.co",
@@ -67,14 +72,47 @@ struct {
   string Tail;
   Packet(Data value) { Value = value; Tail = "tail"; }
   func Copy(): Packet { return self; }
+  static func Score(Data value): uint64 { return value.CountTo; }
+  static func Score(Packet value): uint64 { return value.Value.CountTo + 1; }
 }
 "#,
+        );
+        fixture.write(
+            "models/src/Transformer.co",
+            "interface { func Transform(Data value): Packet; }\n",
+        );
+        fixture.write(
+            "models/src/Processor.co",
+            r"
+class is Transformer {
+  Packet Initial;
+  Processor(Packet initial) { Initial = initial; }
+  func Transform(Data value): Packet { return Packet(Data.Change(value)); }
+}
+",
+        );
+        fixture.write(
+            "app/src/DerivedProcessor.co",
+            r"
+import models::Data;
+import models::Packet;
+import models::Processor;
+class : Processor {
+  DerivedProcessor(Packet initial): Processor(initial) {}
+  override func Transform(Data value): Packet {
+    var result = super.Transform(value);
+    result.Value.CountTo += 3;
+    return result;
+  }
+}
+",
         );
         fixture.write(
             "app/src/Main.co",
             r#"
 import models::Data;
 import models::Packet;
+import models::Transformer;
 static func Main() {
   var data = Data("alive", 100);
   var changed = Data.Change(data);
@@ -91,6 +129,12 @@ static func Main() {
   println(values[1].Value.Text);
   println(packet);
   println(copied::typeName);
+  println(Packet.Score(data));
+  println(Packet.Score(packet));
+  var processor = DerivedProcessor(Packet(Data("initial", 0)));
+  Transformer transformer = processor;
+  println(transformer.Transform(data).Value.CountTo);
+  println(processor.Initial.Value.Text);
 }
 "#,
         );
@@ -99,6 +143,35 @@ static func Main() {
 
     pub fn manifest(&self) -> PathBuf {
         self.root.join("app/Shuttle.toml")
+    }
+
+    pub fn artifact_bytes(&self, relative: &str) -> BTreeMap<String, Vec<u8>> {
+        let directory = self.root.join(relative);
+        ["app", "data-models", "foundation", "tools"]
+            .into_iter()
+            .map(|package| {
+                let path = directory.join(format!("{package}.cpa"));
+                (
+                    package.to_owned(),
+                    fs::read(path).expect("package artifact"),
+                )
+            })
+            .collect()
+    }
+
+    pub fn edit_struct(&self, layout: bool) {
+        let source =
+            fs::read_to_string(self.root.join("models/src/Data.co")).expect("struct source");
+        let changed = if layout {
+            source.replace("byte tag = 1;", "uint64 padding = 123;\n  byte tag = 1;")
+        } else {
+            source.replace(
+                "func hidden(): uint64",
+                "func Added(): uint64 { return CountTo; }\n  func hidden(): uint64",
+            )
+        };
+        assert_ne!(source, changed, "fixture edit did not change the struct");
+        self.write("models/src/Data.co", &changed);
     }
 
     pub fn write(&self, relative: &str, contents: &str) {

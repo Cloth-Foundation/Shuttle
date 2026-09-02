@@ -14,7 +14,7 @@ use std::process::{Command, Output};
 use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
-use support::{Fixture, compiler, expect_status, run};
+use support::{Fixture, STRUCT_OUTPUT, compiler, expect_status, run};
 
 #[derive(Clone, Debug)]
 struct ArtifactRecord {
@@ -78,6 +78,90 @@ fn enums_preserve_native_and_parallel_package_behavior() {
     assert_eq!(first.stdout, whole.stdout);
 }
 
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn structs_preserve_relocated_serial_parallel_artifacts() {
+    let serial = Fixture::structs();
+    let parallel = Fixture::structs();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    // Cross a PE timestamp boundary as well as changing path and scheduling.
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, STRUCT_OUTPUT);
+    assert_eq!(second.stdout, first.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+    let executable = format!("app/target/x86_64/app{}", std::env::consts::EXE_SUFFIX);
+    assert_eq!(
+        fs::read(serial.root.join(&executable)).expect("serial executable"),
+        fs::read(parallel.root.join(&executable)).expect("parallel executable")
+    );
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, STRUCT_OUTPUT);
+    assert!(whole.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn struct_edits_invalidate_native_consumers_and_preserve_independent_reuse() {
+    let fixture = Fixture::structs();
+    let selected = compiler();
+    expect_status(&run(&mut fixture.shuttle("build", &selected)), 0);
+    let directory = "app/target/x86_64/packages";
+    let mut previous = fixture.artifact_bytes(directory);
+    for layout in [true, false] {
+        fixture.edit_struct(layout);
+        let changed = run(&mut fixture.visible_shuttle("run", &selected));
+        expect_status(&changed, 0);
+        assert_eq!(changed.stdout, STRUCT_OUTPUT);
+        let progress = String::from_utf8_lossy(&changed.stderr);
+        let current = fixture.artifact_bytes(directory);
+        for package in ["data-models", "app"] {
+            assert!(
+                progress.contains(&format!("shuttle: compiling {package} ")),
+                "{progress}"
+            );
+            assert_ne!(
+                previous[package], current[package],
+                "stale {package} artifact"
+            );
+        }
+        for package in ["foundation", "tools"] {
+            assert!(
+                progress.contains(&format!("shuttle: reusing {package} ")),
+                "{progress}"
+            );
+            assert_eq!(
+                previous[package], current[package],
+                "unrelated {package} changed"
+            );
+        }
+        let unchanged = run(&mut fixture.visible_shuttle("run", &selected));
+        expect_status(&unchanged, 0);
+        assert_eq!(unchanged.stdout, STRUCT_OUTPUT);
+        let progress = String::from_utf8_lossy(&unchanged.stderr);
+        assert_eq!(
+            progress.matches("shuttle: reusing ").count(),
+            4,
+            "{progress}"
+        );
+        assert!(!progress.contains("shuttle: compiling "), "{progress}");
+        assert_eq!(current, fixture.artifact_bytes(directory));
+        previous = current;
+    }
+    let whole = whole_project_run(&fixture);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, STRUCT_OUTPUT);
+    assert!(whole.stderr.is_empty());
+}
+
 fn inspect_artifact(path: &Path) -> ArtifactRecord {
     let output = run(Command::new(compiler())
         .args(["--shuttle-protocol", "2", "--operation", "inspect"])
@@ -102,7 +186,7 @@ fn structs_link_and_execute_without_dependency_sources() {
     let selected = compiler();
     let separate = run(&mut fixture.shuttle("run", &selected));
     expect_status(&separate, 0);
-    let expected = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n";
+    let expected = STRUCT_OUTPUT;
     assert_eq!(separate.stdout, expected);
     assert!(separate.stderr.is_empty());
     let whole = whole_project_run(&fixture);

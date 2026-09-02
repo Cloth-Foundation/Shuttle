@@ -166,6 +166,32 @@ Shuttle still treats compiler artifacts as opaque and introduces no process,
 receipt, manifest, or scheduling protocol change.
 
 The compiler owns ABI 4 and runtime ABI 2 compatibility; older packages must
-be rebuilt. This closes the 26.3 compatibility checkpoint, not Stage 26. The
-26.4 audit remains open for struct-specific layout-change invalidation,
-serial/parallel byte equivalence, and the coordinated exit matrix.
+be rebuilt. That closed the 26.3 compatibility checkpoint, not Stage 26. The
+remaining struct-specific invalidation and equivalence work was verified in
+the 26.4 audit below.
+
+## Stage 26.4 struct exit audit
+
+Verified on Windows on 2026-09-02. Development and ASan/UBSan compiler builds
+each pass all 121 CTests, including **22 shared protocol and 12 native tests**.
+All 43 ordinary Rust tests, Rust 1.85 checking, formatting, and Clippy with
+warnings denied pass.
+
+Struct fixtures prove:
+
+- relocated one-job/four-job interface artifacts are byte-identical on x86-64
+  and wasm32; native artifacts and executables are byte-identical on x86-64
+  across a PE timestamp boundary;
+- private-layout and member additions rebuild affected consumers, preserve
+  unrelated artifact bytes and reuse, and permit complete reuse on the next
+  unchanged invocation;
+- whole-project and separate execution match both before and after those edits;
+- source-free packages preserve aggregate overloads, constructor arguments,
+  results, inherited fields, interface dispatch, and `super` calls; and
+- private constructors/fields/methods remain inaccessible with dependency
+  sources removed, and failed compilation preserves completed output.
+
+**Stage 26 coordination is complete.** Artifacts remain opaque to Shuttle.
+Format 3, compiler ABI 4, runtime ABI 2, process protocol 2, receipt schema 1,
+and manifest schema 1 are unchanged by this audit. No scheduling policy,
+new build system, remote dependency feature, or subsequent stage is introduced.
