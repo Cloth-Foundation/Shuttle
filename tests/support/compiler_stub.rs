@@ -22,10 +22,11 @@ fn main() {
     } else {
         operation.as_deref().expect("operation")
     };
+    let log_path = PathBuf::from(env::var_os("SHUTTLE_STUB_LOG").expect("stub log"));
     let mut log = OpenOptions::new()
         .append(true)
         .create(true)
-        .open(env::var_os("SHUTTLE_STUB_LOG").expect("stub log"))
+        .open(&log_path)
         .expect("open log");
     let detail = if matches!(phase, "compile" | "reuse") {
         package_name(&arguments).unwrap_or_default()
@@ -61,7 +62,15 @@ fn main() {
         std::process::exit(7);
     }
     if phase == "compile" {
-        if mode == "compile-wait" {
+        if mode == "parallel-barrier" && matches!(detail.as_str(), "data-models" | "tools") {
+            parallel_barrier(&log_path, &detail);
+        } else if mode == "parallel-failure" && matches!(detail.as_str(), "data-models" | "tools") {
+            if detail == "data-models" {
+                thread::sleep(Duration::from_millis(200));
+            }
+            eprintln!("{detail}.co:3:5: error: parallel stub rejection");
+            std::process::exit(1);
+        } else if mode == "compile-wait" {
             thread::sleep(Duration::from_millis(500));
         } else if let Some(code) = mode.strip_prefix("compile-") {
             eprintln!("fixture.co:3:5: error: stub rejection");
@@ -78,6 +87,24 @@ fn main() {
     } else if phase == "link" {
         link(&arguments);
     }
+}
+
+fn parallel_barrier(log_path: &Path, package: &str) {
+    let directory = log_path.parent().expect("stub log parent");
+    fs::write(directory.join(format!("{package}.ready")), b"ready").expect("write ready marker");
+    let peer = if package == "data-models" {
+        "tools"
+    } else {
+        "data-models"
+    };
+    for _ in 0..1_000 {
+        if directory.join(format!("{peer}.ready")).is_file() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    eprintln!("parallel compiler barrier timed out waiting for {peer}");
+    std::process::exit(42);
 }
 
 fn compile(arguments: &[std::ffi::OsString]) {

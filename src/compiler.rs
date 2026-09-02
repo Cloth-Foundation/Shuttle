@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fmt;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -16,6 +16,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use clap::ValueEnum;
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
+use tempfile::NamedTempFile;
 
 use crate::diagnostic::Diagnostic;
 use crate::graph::PackageGraph;
@@ -91,6 +92,13 @@ impl BuildProgress {
             package.version,
             index + 1,
             self.package_count
+        ));
+    }
+
+    fn scheduling(&self, jobs: usize) {
+        self.write(format_args!(
+            "scheduling with {jobs} job{}",
+            if jobs == 1 { "" } else { "s" }
         ));
     }
 
@@ -363,13 +371,38 @@ struct PackageCompilation<'a> {
     artifact_directory: &'a Path,
     state_directory: &'a Path,
     progress: &'a BuildProgress,
+    jobs: usize,
+}
+
+struct PackageTask<'a> {
+    index: usize,
+    name: &'a str,
+    package: &'a crate::graph::PackageRecord,
+    output: PathBuf,
+    cached: Vec<ArtifactReceipt>,
+    candidate: bool,
 }
 
 struct CapturedProcess {
     status: std::process::ExitStatus,
     stdout: Vec<u8>,
     stdout_oversized: bool,
-    stderr_nonempty: bool,
+    stderr: NamedTempFile,
+    stderr_length: u64,
+}
+
+struct CompilerExecution<T> {
+    captured: Option<CapturedProcess>,
+    result: Result<T, ProcessFailure>,
+}
+
+impl<T> CompilerExecution<T> {
+    fn failed(failure: ProcessFailure) -> Self {
+        Self {
+            captured: None,
+            result: Err(failure),
+        }
+    }
 }
 
 struct BuildLock {
@@ -431,7 +464,13 @@ pub fn execute_graph(
     command: ProjectCommand,
     target: Target,
     progress_mode: ProgressMode,
+    jobs: usize,
 ) -> Result<(), ProcessFailure> {
+    if jobs == 0 {
+        return Err(process_error(
+            "package job limit must be greater than zero".to_owned(),
+        ));
+    }
     if command != ProjectCommand::Check && target != Target::X86_64 {
         return Err(process_error(
             "native executable output currently supports only target 'x86_64'".to_owned(),
@@ -441,6 +480,8 @@ pub fn execute_graph(
     let capabilities = query_capabilities(compiler)?;
     validate_capabilities(&capabilities, target, command)?;
     let order = topological_order(graph)?;
+    let effective_jobs = jobs.min(order.len().max(1));
+    progress.scheduling(effective_jobs);
     let workspace = create_build_workspace(graph, command, target)?;
     let artifact_kind = if command == ProjectCommand::Check {
         "interface"
@@ -458,6 +499,7 @@ pub fn execute_graph(
             artifact_directory: &workspace.artifact_directory,
             state_directory: &workspace.state_directory,
             progress: &progress,
+            jobs: effective_jobs,
         },
     )?;
     if command != ProjectCommand::Check {
@@ -646,106 +688,319 @@ fn compile_packages(
     compilation: &PackageCompilation<'_>,
 ) -> Result<BTreeMap<String, ProducedArtifact>, ProcessFailure> {
     let mut produced = BTreeMap::<String, ProducedArtifact>::new();
-    for (index, package_name) in compilation.order.iter().enumerate() {
-        let package = compilation
-            .graph
-            .packages
-            .get(package_name)
-            .ok_or_else(|| process_error("ordered package is missing".to_owned()))?;
-        let output = compilation
-            .artifact_directory
-            .join(format!("{package_name}.cpa"));
-        let cached = cached_receipts(compilation.state_directory, package);
-        if output.is_file() && !cached.is_empty() {
-            compilation.progress.validating(index, package);
-            let arguments = package_arguments(
-                compilation.graph,
-                package_name,
-                compilation.target,
-                compilation.artifact_kind,
-                PackageOperation::Reuse(&output),
-                &produced,
-            )?;
-            if let Some(receipt) = reuse_receipt(compiler, package_name, &arguments)? {
-                validate_compile_receipt(
-                    &receipt,
-                    package,
-                    compilation.artifact_kind,
-                    compilation.target,
-                    compilation.compiler_id,
-                    compilation.graph,
-                    &produced,
-                )?;
-                if cached.contains(&receipt) {
-                    compilation.progress.reusing(index, package);
-                    produced.insert(
-                        package_name.clone(),
-                        ProducedArtifact {
-                            path: output,
-                            receipt,
-                        },
-                    );
-                    continue;
-                }
-            }
-        }
-
-        compilation.progress.package(index, package);
-        let arguments = package_arguments(
-            compilation.graph,
-            package_name,
-            compilation.target,
-            compilation.artifact_kind,
-            PackageOperation::Compile(&output),
-            &produced,
-        )?;
-        let captured = invoke_compiler(compiler, &arguments, RECEIPT_LIMIT)?;
-        require_compiler_success(compiler, package_name, "compile", &captured)?;
-        let receipt = parse_receipt(&captured.stdout)?;
-        validate_compile_receipt(
-            &receipt,
-            package,
-            compilation.artifact_kind,
-            compilation.target,
-            compilation.compiler_id,
-            compilation.graph,
-            &produced,
-        )?;
-        if !output.is_file() {
-            return Err(process_error(format!(
-                "compiler reported success without artifact '{}'",
-                display_path(&output)
-            )));
-        }
-        publish_build_state(compilation.state_directory, package, &receipt)?;
-        produced.insert(
-            package_name.clone(),
-            ProducedArtifact {
-                path: output,
-                receipt,
-            },
-        );
+    for level in dependency_levels(compilation.graph, compilation.order)? {
+        compile_package_level(compiler, compilation, &level, &mut produced)?;
     }
 
     Ok(produced)
 }
 
-fn reuse_receipt(
+fn compile_package_level(
+    compiler: &Path,
+    compilation: &PackageCompilation<'_>,
+    level: &[(usize, String)],
+    produced: &mut BTreeMap<String, ProducedArtifact>,
+) -> Result<(), ProcessFailure> {
+    let tasks = level
+        .iter()
+        .map(|(index, package_name)| {
+            let package = compilation
+                .graph
+                .packages
+                .get(package_name)
+                .ok_or_else(|| process_error("ordered package is missing".to_owned()))?;
+            let output = compilation
+                .artifact_directory
+                .join(format!("{package_name}.cpa"));
+            let cached = cached_receipts(compilation.state_directory, package);
+            let candidate = output.is_file() && !cached.is_empty();
+            Ok(PackageTask {
+                index: *index,
+                name: package_name,
+                package,
+                output,
+                cached,
+                candidate,
+            })
+        })
+        .collect::<Result<Vec<_>, ProcessFailure>>()?;
+    let compile_positions = validate_package_candidates(compiler, compilation, &tasks, produced)?;
+    compile_selected_packages(compiler, compilation, &tasks, &compile_positions, produced)
+}
+
+fn validate_package_candidates(
+    compiler: &Path,
+    compilation: &PackageCompilation<'_>,
+    tasks: &[PackageTask<'_>],
+    produced: &mut BTreeMap<String, ProducedArtifact>,
+) -> Result<BTreeSet<usize>, ProcessFailure> {
+    let mut compile_positions = tasks
+        .iter()
+        .enumerate()
+        .filter(|(_, task)| !task.candidate)
+        .map(|(position, _)| position)
+        .collect::<BTreeSet<_>>();
+    let candidate_positions = tasks
+        .iter()
+        .enumerate()
+        .filter(|(_, task)| task.candidate)
+        .map(|(position, _)| position)
+        .collect::<Vec<_>>();
+    for positions in candidate_positions.chunks(compilation.jobs) {
+        for position in positions {
+            let task = &tasks[*position];
+            compilation.progress.validating(task.index, task.package);
+        }
+        let mut validations =
+            run_candidate_validations(compiler, compilation, tasks, positions, produced);
+        for position in positions {
+            let task = &tasks[*position];
+            let execution = validations.remove(position).ok_or_else(|| {
+                process_error(format!(
+                    "package '{}' validation worker returned no result",
+                    task.name
+                ))
+            })?;
+            if let Some(captured) = &execution.captured {
+                replay_compiler_stderr(captured)?;
+            }
+            if let Some(receipt) = execution.result? {
+                compilation.progress.reusing(task.index, task.package);
+                produced.insert(
+                    task.name.to_owned(),
+                    ProducedArtifact {
+                        path: task.output.clone(),
+                        receipt,
+                    },
+                );
+            } else {
+                compile_positions.insert(*position);
+            }
+        }
+    }
+    Ok(compile_positions)
+}
+
+fn run_candidate_validations(
+    compiler: &Path,
+    compilation: &PackageCompilation<'_>,
+    tasks: &[PackageTask<'_>],
+    positions: &[usize],
+    produced: &BTreeMap<String, ProducedArtifact>,
+) -> BTreeMap<usize, CompilerExecution<Option<ArtifactReceipt>>> {
+    thread::scope(|scope| {
+        let handles = positions
+            .iter()
+            .map(|position| {
+                let position = *position;
+                let task = &tasks[position];
+                (
+                    position,
+                    scope.spawn(move || {
+                        validate_package_candidate(compiler, compilation, task, produced)
+                    }),
+                )
+            })
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .map(|(position, handle)| {
+                (
+                    position,
+                    handle.join().unwrap_or_else(|_| {
+                        CompilerExecution::failed(process_error(
+                            "package validation worker panicked".to_owned(),
+                        ))
+                    }),
+                )
+            })
+            .collect()
+    })
+}
+
+fn compile_selected_packages(
+    compiler: &Path,
+    compilation: &PackageCompilation<'_>,
+    tasks: &[PackageTask<'_>],
+    compile_positions: &BTreeSet<usize>,
+    produced: &mut BTreeMap<String, ProducedArtifact>,
+) -> Result<(), ProcessFailure> {
+    let positions = compile_positions.iter().copied().collect::<Vec<_>>();
+    for positions in positions.chunks(compilation.jobs) {
+        for position in positions {
+            let task = &tasks[*position];
+            compilation.progress.package(task.index, task.package);
+        }
+        let mut compilations =
+            run_package_compilations(compiler, compilation, tasks, positions, produced);
+        for position in positions {
+            let task = &tasks[*position];
+            let execution = compilations.remove(position).ok_or_else(|| {
+                process_error(format!(
+                    "package '{}' compiler worker returned no result",
+                    task.name
+                ))
+            })?;
+            if let Some(captured) = &execution.captured {
+                replay_compiler_stderr(captured)?;
+            }
+            let receipt = execution.result?;
+            publish_build_state(compilation.state_directory, task.package, &receipt)?;
+            produced.insert(
+                task.name.to_owned(),
+                ProducedArtifact {
+                    path: task.output.clone(),
+                    receipt,
+                },
+            );
+        }
+    }
+    Ok(())
+}
+
+fn run_package_compilations(
+    compiler: &Path,
+    compilation: &PackageCompilation<'_>,
+    tasks: &[PackageTask<'_>],
+    positions: &[usize],
+    produced: &BTreeMap<String, ProducedArtifact>,
+) -> BTreeMap<usize, CompilerExecution<ArtifactReceipt>> {
+    thread::scope(|scope| {
+        let handles = positions
+            .iter()
+            .map(|position| {
+                let position = *position;
+                let task = &tasks[position];
+                (
+                    position,
+                    scope.spawn(move || {
+                        compile_package_artifact(compiler, compilation, task, produced)
+                    }),
+                )
+            })
+            .collect::<Vec<_>>();
+        handles
+            .into_iter()
+            .map(|(position, handle)| {
+                (
+                    position,
+                    handle.join().unwrap_or_else(|_| {
+                        CompilerExecution::failed(process_error(
+                            "package compiler worker panicked".to_owned(),
+                        ))
+                    }),
+                )
+            })
+            .collect()
+    })
+}
+
+fn validate_package_candidate(
+    compiler: &Path,
+    compilation: &PackageCompilation<'_>,
+    task: &PackageTask<'_>,
+    produced: &BTreeMap<String, ProducedArtifact>,
+) -> CompilerExecution<Option<ArtifactReceipt>> {
+    let arguments = match package_arguments(
+        compilation.graph,
+        task.name,
+        compilation.target,
+        compilation.artifact_kind,
+        PackageOperation::Reuse(&task.output),
+        produced,
+    ) {
+        Ok(arguments) => arguments,
+        Err(failure) => return CompilerExecution::failed(failure),
+    };
+    let captured = match invoke_compiler(compiler, &arguments, RECEIPT_LIMIT) {
+        Ok(captured) => captured,
+        Err(failure) => return CompilerExecution::failed(failure),
+    };
+    let result = parse_reuse_receipt(compiler, task.name, &captured).and_then(|receipt| {
+        receipt
+            .map(|receipt| {
+                validate_compile_receipt(
+                    &receipt,
+                    task.package,
+                    compilation.artifact_kind,
+                    compilation.target,
+                    compilation.compiler_id,
+                    compilation.graph,
+                    produced,
+                )?;
+                Ok(task.cached.contains(&receipt).then_some(receipt))
+            })
+            .transpose()
+            .map(Option::flatten)
+    });
+    CompilerExecution {
+        captured: Some(captured),
+        result,
+    }
+}
+
+fn compile_package_artifact(
+    compiler: &Path,
+    compilation: &PackageCompilation<'_>,
+    task: &PackageTask<'_>,
+    produced: &BTreeMap<String, ProducedArtifact>,
+) -> CompilerExecution<ArtifactReceipt> {
+    let arguments = match package_arguments(
+        compilation.graph,
+        task.name,
+        compilation.target,
+        compilation.artifact_kind,
+        PackageOperation::Compile(&task.output),
+        produced,
+    ) {
+        Ok(arguments) => arguments,
+        Err(failure) => return CompilerExecution::failed(failure),
+    };
+    let captured = match invoke_compiler(compiler, &arguments, RECEIPT_LIMIT) {
+        Ok(captured) => captured,
+        Err(failure) => return CompilerExecution::failed(failure),
+    };
+    let result = require_compiler_success(compiler, task.name, "compile", &captured)
+        .and_then(|()| parse_receipt(&captured.stdout))
+        .and_then(|receipt| {
+            validate_compile_receipt(
+                &receipt,
+                task.package,
+                compilation.artifact_kind,
+                compilation.target,
+                compilation.compiler_id,
+                compilation.graph,
+                produced,
+            )?;
+            if !task.output.is_file() {
+                return Err(process_error(format!(
+                    "compiler reported success without artifact '{}'",
+                    display_path(&task.output)
+                )));
+            }
+            Ok(receipt)
+        });
+    CompilerExecution {
+        captured: Some(captured),
+        result,
+    }
+}
+
+fn parse_reuse_receipt(
     compiler: &Path,
     package: &str,
-    arguments: &[OsString],
+    captured: &CapturedProcess,
 ) -> Result<Option<ArtifactReceipt>, ProcessFailure> {
-    let captured = invoke_compiler(compiler, arguments, RECEIPT_LIMIT)?;
     if captured.status.code() == Some(3) {
-        if captured.stdout_oversized || !captured.stdout.is_empty() || captured.stderr_nonempty {
+        if captured.stdout_oversized || !captured.stdout.is_empty() || captured.stderr_length != 0 {
             return Err(process_error(format!(
                 "package '{package}', reuse: compiler cache miss polluted its protocol streams"
             )));
         }
         return Ok(None);
     }
-    require_compiler_success(compiler, package, "reuse", &captured)?;
-    if captured.stderr_nonempty {
+    require_compiler_success(compiler, package, "reuse", captured)?;
+    if captured.stderr_length != 0 {
         return Err(process_error(format!(
             "package '{package}', reuse: compiler success produced unexpected stderr"
         )));
@@ -870,6 +1125,7 @@ fn link_executable(
         arguments.push(protocol_path_argument(&artifact.path));
     }
     let captured = invoke_compiler(compiler, &arguments, 1)?;
+    replay_compiler_stderr(&captured)?;
     require_compiler_success(compiler, &graph.root_package, "link", &captured)?;
     if !captured.stdout.is_empty() {
         return Err(process_error(
@@ -907,7 +1163,8 @@ fn run_executable(output: &Path) -> Result<(), ProcessFailure> {
 fn query_capabilities(compiler: &Path) -> Result<Capabilities, ProcessFailure> {
     let arguments = [OsString::from("--shuttle-protocol-capabilities")];
     let captured = invoke_compiler(compiler, &arguments, CAPABILITY_LIMIT)?;
-    if !captured.status.success() || captured.stderr_nonempty || captured.stdout_oversized {
+    replay_compiler_stderr(&captured)?;
+    if !captured.status.success() || captured.stderr_length != 0 || captured.stdout_oversized {
         return Err(process_error(format!(
             "compiler '{}' does not provide valid Shuttle protocol capabilities",
             display_path(compiler)
@@ -953,6 +1210,11 @@ fn invoke_compiler(
     arguments: &[OsString],
     stdout_limit: usize,
 ) -> Result<CapturedProcess, ProcessFailure> {
+    let stderr_spool = NamedTempFile::new().map_err(|error| {
+        process_error(format!(
+            "could not create private compiler diagnostic spool: {error}"
+        ))
+    })?;
     let mut child = Command::new(compiler)
         .args(arguments)
         .stdin(Stdio::null())
@@ -990,21 +1252,10 @@ fn invoke_compiler(
         }
         Ok((captured, oversized))
     });
-    let stderr_thread = thread::spawn(move || -> std::io::Result<bool> {
-        let mut found = false;
-        let mut buffer = [0_u8; 8192];
-        let stderr_output = std::io::stderr();
-        let mut destination = stderr_output.lock();
-        loop {
-            let count = stderr.read(&mut buffer)?;
-            if count == 0 {
-                break;
-            }
-            found = true;
-            destination.write_all(&buffer[..count])?;
-            destination.flush()?;
-        }
-        Ok(found)
+    let stderr_thread = thread::spawn(move || -> io::Result<(NamedTempFile, u64)> {
+        let mut spool = stderr_spool;
+        let length = io::copy(&mut stderr, spool.as_file_mut())?;
+        Ok((spool, length))
     });
     let status = child.wait().map_err(|error| {
         process_error(format!(
@@ -1016,7 +1267,7 @@ fn invoke_compiler(
         .join()
         .map_err(|_| process_error("compiler stdout reader panicked".to_owned()))?
         .map_err(|error| process_error(format!("could not read compiler stdout: {error}")))?;
-    let stderr_nonempty = stderr_thread
+    let (stderr, stderr_length) = stderr_thread
         .join()
         .map_err(|_| process_error("compiler stderr reader panicked".to_owned()))?
         .map_err(|error| process_error(format!("could not read compiler stderr: {error}")))?;
@@ -1024,8 +1275,25 @@ fn invoke_compiler(
         status,
         stdout,
         stdout_oversized,
-        stderr_nonempty,
+        stderr,
+        stderr_length,
     })
+}
+
+fn replay_compiler_stderr(captured: &CapturedProcess) -> Result<(), ProcessFailure> {
+    if captured.stderr_length == 0 {
+        return Ok(());
+    }
+    let mut source = captured.stderr.reopen().map_err(|error| {
+        process_error(format!(
+            "could not reopen private compiler diagnostic spool: {error}"
+        ))
+    })?;
+    let destination = io::stderr();
+    let mut destination = destination.lock();
+    io::copy(&mut source, &mut destination)
+        .and_then(|_| destination.flush())
+        .map_err(|error| process_error(format!("could not replay compiler diagnostics: {error}")))
 }
 
 fn require_compiler_success(
@@ -1195,6 +1463,47 @@ fn topological_order(graph: &PackageGraph) -> Result<Vec<String>, ProcessFailure
         ));
     }
     Ok(order)
+}
+
+fn dependency_levels(
+    graph: &PackageGraph,
+    order: &[String],
+) -> Result<Vec<Vec<(usize, String)>>, ProcessFailure> {
+    let mut direct_dependencies = BTreeMap::<String, Vec<String>>::new();
+    for dependency in &graph.dependencies {
+        direct_dependencies
+            .entry(dependency.owner.clone())
+            .or_default()
+            .push(dependency.target.clone());
+    }
+    let mut package_levels = BTreeMap::<String, usize>::new();
+    let mut levels = Vec::<Vec<(usize, String)>>::new();
+    for package_name in order {
+        let level = direct_dependencies
+            .get(package_name)
+            .into_iter()
+            .flatten()
+            .map(|dependency| {
+                package_levels.get(dependency).copied().ok_or_else(|| {
+                    process_error(format!(
+                        "package '{package_name}' was ordered before dependency '{dependency}'"
+                    ))
+                })
+            })
+            .collect::<Result<Vec<_>, ProcessFailure>>()?
+            .into_iter()
+            .max()
+            .map_or(0, |dependency_level| dependency_level + 1);
+        while levels.len() <= level {
+            levels.push(Vec::new());
+        }
+        levels[level].push((0, package_name.clone()));
+        package_levels.insert(package_name.clone(), level);
+    }
+    for (index, package) in levels.iter_mut().flatten().enumerate() {
+        package.0 = index;
+    }
+    Ok(levels)
 }
 
 fn transitive_dependencies(graph: &PackageGraph, package: &str) -> BTreeSet<String> {

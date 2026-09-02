@@ -2,6 +2,7 @@
 // Exceptions. See LICENSE.txt in the project root for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
 use clap::{Args, Parser, Subcommand};
@@ -51,6 +52,10 @@ struct ProjectOptions {
     /// Suppress successful build progress.
     #[arg(long)]
     quiet: bool,
+
+    /// Limit concurrent package compiler processes.
+    #[arg(long, value_name = "COUNT")]
+    jobs: Option<NonZeroUsize>,
 }
 
 #[derive(Debug)]
@@ -99,14 +104,24 @@ pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure>
     } else {
         ProgressMode::Visible
     };
-    execute_graph(&compiler, &graph, project_command, options.target, progress).map_err(|failure| {
-        CommandFailure {
-            exit_code: failure.exit_code,
-            diagnostics: failure
-                .message
-                .map(Diagnostic::global)
-                .into_iter()
-                .collect(),
-        }
+    let jobs = options.jobs.map_or_else(
+        || std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
+        NonZeroUsize::get,
+    );
+    execute_graph(
+        &compiler,
+        &graph,
+        project_command,
+        options.target,
+        progress,
+        jobs,
+    )
+    .map_err(|failure| CommandFailure {
+        exit_code: failure.exit_code,
+        diagnostics: failure
+            .message
+            .map(Diagnostic::global)
+            .into_iter()
+            .collect(),
     })
 }

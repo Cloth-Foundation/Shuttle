@@ -123,3 +123,21 @@ fn unsupported_targets_are_rejected_by_the_cli() {
     assert!(stderr.contains("x86_64"));
     assert!(stderr.contains("wasm32"));
 }
+
+#[test]
+fn package_job_limit_is_positive_and_documented() {
+    let project = TempDir::new().expect("create temporary directory");
+    let help = shuttle(project.path(), &["check", "--help"]);
+    assert!(help.status.success());
+    assert!(
+        String::from_utf8(help.stdout)
+            .expect("UTF-8 help")
+            .contains("--jobs <COUNT>")
+    );
+
+    let output = shuttle(project.path(), &["check", "--jobs", "0"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).expect("UTF-8 standard error");
+    assert!(stderr.contains("invalid value '0'"));
+}

@@ -114,3 +114,24 @@ Clang/MSVC-library ASan/UBSan compiler:
 
 Stage 24.3 is complete. Deterministic bounded parallel scheduling remains the
 active Stage 24.4 work.
+
+## Stage 24.4 parallel scheduling and exit audit
+
+Verified on Windows on 2026-09-01 with the GNU development compiler and the
+Clang/MSVC-library ASan/UBSan compiler:
+
+- `--jobs` rejects zero, defaults to available host parallelism, and never runs
+  more package compiler processes than its effective bound;
+- a two-worker barrier proves that the independent fixture packages overlap,
+  while canonical progress remains stable;
+- private diagnostic spools prevent interleaving and select the same exact
+  failure bytes as `--jobs 1` even when another worker fails first;
+- real-compiler serial and parallel diagnostics are byte-identical; and
+- relocated one-job and four-job native builds produce byte-identical package
+  artifacts and executables.
+
+All 92 development and 92 sanitizer CTest entries pass, including 18 shared
+protocol and eight native cases. All 43 ordinary Shuttle tests, Rust 1.85, Rust
+formatting and Clippy, C++ formatting, and both repositories' whitespace checks
+pass. The Stage 24.2 responsiveness baseline and Stage 24.3 unchanged-build
+coverage remain intact. Stage 24 is complete.
