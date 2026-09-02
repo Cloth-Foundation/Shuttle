@@ -13,7 +13,36 @@ criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
 Stage 22 is complete, including the shared process, native, and sanitizer
-verification. Stages 23 and 24 are also complete.
+verification. Stages 23 through 25 are also complete. Stage 26 coordination is
+active: the approved 26.3 compatibility transition and source-free aggregate
+tests are implemented. Stage 26.4 remains the coordinated equivalence and exit
+audit; the compiler roadmap owns the language and ABI contracts.
+
+## Stage 26: Aggregate artifact compatibility
+
+Status: **active — 26.3 compatibility complete; 26.4 exit audit pending**
+
+Objective: support the compiler-owned struct artifact/ABI transition and prove
+aggregate behavior across the existing separate-compilation boundary.
+
+Prerequisite: completed Stage 25. The compiler's source contract was approved
+on 2026-09-02, followed by the separate 26.3 ABI/schema approval. The implemented
+transition is artifact format 3, compiler ABI 4, and runtime ABI 2. Shuttle
+requires format 3 capabilities/receipts; older packages must be rebuilt.
+Process protocol 2, receipt schema 1, and manifest schema 1 are unchanged.
+
+Deliverables: coordinate reviewed capability/receipt version requirements;
+test source-free struct dependencies, aggregate calls and GC-bearing values,
+layout-change invalidation, and whole-project/separate and serial/parallel
+equivalence. Continue treating artifacts as opaque compiler-owned data.
+
+Non-goals: manifest or process-protocol changes, compiler internals in Rust,
+artifact deserialization, remote dependencies, or new build scheduling policy.
+
+Exit criteria: reviewed version mismatches fail clearly; aggregate dependency
+execution and source-free consumption pass; layout changes invalidate affected
+consumers; deterministic artifacts, Rust checks, and shared development/native/
+sanitizer suites pass. The compiler roadmap owns language and runtime work.
 
 ## Stage 25: Enum artifact compatibility
 

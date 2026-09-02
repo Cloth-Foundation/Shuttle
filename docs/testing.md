@@ -149,3 +149,23 @@ independent-package reuse, byte-identical serial/parallel artifacts, and
 whole-project/separate native equivalence. Shuttle continues to treat compiler
 artifacts as opaque. Process protocol 2 and manifest schema 1 are unchanged;
 format-1 packages must be rebuilt. Stage 25 is complete.
+
+## Stage 26.3 aggregate compatibility checkpoint
+
+Verified on Windows on 2026-09-02. Both compiler development and ASan/UBSan
+configurations pass all 121 CTest entries, including 21 real-compiler protocol
+tests and ten native tests. All 43 ordinary Shuttle tests, formatting, Clippy
+with warnings denied, and the Rust 1.85 baseline pass.
+
+Capabilities and receipts require artifact format 3; tests reject old format-2
+responses before compilation or reusable-state publication. Source-free
+aggregate dependencies work for wasm32 interface checking and x86-64 native
+compilation, retaining private layouts and aggregate calls. Nested values,
+arrays, shallow references, equality, and output match whole-project behavior.
+Shuttle still treats compiler artifacts as opaque and introduces no process,
+receipt, manifest, or scheduling protocol change.
+
+The compiler owns ABI 4 and runtime ABI 2 compatibility; older packages must
+be rebuilt. This closes the 26.3 compatibility checkpoint, not Stage 26. The
+26.4 audit remains open for struct-specific layout-change invalidation,
+serial/parallel byte equivalence, and the coordinated exit matrix.

@@ -121,6 +121,45 @@ fn enum_cases_and_constants_are_available_without_dependency_sources() {
     assert!(app.path.is_file());
 }
 
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn structs_are_available_without_dependency_sources() {
+    let fixture = Fixture::structs();
+    let foundation = compile_interface(
+        &fixture,
+        ("foundation", "1.0.0", "core/src"),
+        None,
+        &[],
+        &[],
+    );
+    let models = compile_interface(
+        &fixture,
+        ("data-models", "1.2.3-beta.1+local", "models/src"),
+        None,
+        &[("foundation", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    let tools = compile_interface(
+        &fixture,
+        ("tools", "0.2.0", "tools/src"),
+        None,
+        &[("base", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    for directory in ["core/src", "models/src", "tools/src"] {
+        fs::remove_dir_all(fixture.root.join(directory))
+            .expect("remove temporary dependency sources");
+    }
+    let app = compile_interface(
+        &fixture,
+        ("app", "0.1.0", "app/src"),
+        Some("Main.co"),
+        &[("models", "data-models"), ("tools", "tools")],
+        &[foundation, models, tools],
+    );
+    assert!(app.path.is_file());
+}
+
 fn invoke(fixture: &Fixture, arguments: &[OsString]) -> std::process::Output {
     run(Command::new(compiler())
         .current_dir(&fixture.root)

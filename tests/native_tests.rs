@@ -95,6 +95,90 @@ fn inspect_artifact(path: &Path) -> ArtifactRecord {
     }
 }
 
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn structs_link_and_execute_without_dependency_sources() {
+    let fixture = Fixture::structs();
+    let selected = compiler();
+    let separate = run(&mut fixture.shuttle("run", &selected));
+    expect_status(&separate, 0);
+    let expected = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n";
+    assert_eq!(separate.stdout, expected);
+    assert!(separate.stderr.is_empty());
+    let whole = whole_project_run(&fixture);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, separate.stdout);
+
+    let mut artifacts = artifact_records(&fixture);
+    // Hide only test-owned sources. The next compile and link must use package
+    // declarations, aggregate layouts, physical signatures, and object payloads.
+    for package in ["core", "models", "tools"] {
+        fs::rename(
+            fixture.root.join(package).join("src"),
+            fixture.root.join(package).join("hidden-source"),
+        )
+        .expect("hide dependency sources");
+    }
+    let app_path = fixture.root.join("source-free-app.cpa");
+    let mut compile = Command::new(&selected);
+    compile
+        .current_dir(&fixture.root)
+        .args([
+            "--shuttle-protocol",
+            "2",
+            "--operation",
+            "compile",
+            "--target",
+            "x86_64",
+            "--artifact-kind",
+            "object",
+            "--output",
+        ])
+        .arg(&app_path)
+        .args(["--package", "app", "0.1.0"])
+        .arg(fixture.root.join("app/src"))
+        .args([
+            "--entry",
+            "Main.co",
+            "--dependency",
+            "models",
+            "data-models",
+            "--dependency",
+            "tools",
+            "tools",
+        ]);
+    for artifact in &artifacts {
+        if artifact.name == "app" {
+            continue;
+        }
+        compile
+            .args([
+                "--artifact",
+                &artifact.name,
+                &artifact.version,
+                &artifact.digest,
+            ])
+            .arg(&artifact.path);
+    }
+    let compiled = run(&mut compile);
+    expect_status(&compiled, 0);
+    assert!(compiled.stderr.is_empty());
+    let app_index = artifacts
+        .iter()
+        .position(|artifact| artifact.name == "app")
+        .expect("app artifact");
+    artifacts[app_index] = inspect_artifact(&app_path);
+    let executable = fixture
+        .root
+        .join(format!("source-free-app{}", std::env::consts::EXE_SUFFIX));
+    let linked = invoke_link(&fixture, &executable, &artifacts);
+    expect_status(&linked, 0);
+    let executed = run(&mut Command::new(executable));
+    expect_status(&executed, 0);
+    assert_eq!(executed.stdout, expected);
+    assert!(executed.stderr.is_empty());
+}
+
 fn artifact_records(fixture: &Fixture) -> Vec<ArtifactRecord> {
     let directory = fixture.root.join("app/target/x86_64/packages");
     let mut paths = fs::read_dir(directory)

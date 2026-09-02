@@ -112,6 +112,7 @@ fn rejects_incompatible_queries_without_compilation_or_output_creation() {
     let compiler = stub(&fixture);
     for mode in [
         "query-version",
+        "query-old-artifact-format",
         "query-no-newline",
         "query-stderr",
         "query-exit",
@@ -136,6 +137,7 @@ fn rejects_malformed_or_mismatched_compile_receipts() {
         "receipt-trailing",
         "receipt-wrong-package",
         "receipt-bad-digest",
+        "receipt-old-artifact-format",
     ] {
         let fixture = Fixture::new();
         let compiler = stub(&fixture);
