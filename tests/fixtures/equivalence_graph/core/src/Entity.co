@@ -7,11 +7,11 @@ abstract class is Scored {
     Value = value;
   }
 
-  func Name(): string {
+  override func Name(): string {
     return NameValue;
   }
 
-  func Score(): int32 {
+  override func Score(): int32 {
     return Value;
   }
 
