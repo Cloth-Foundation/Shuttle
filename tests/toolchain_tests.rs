@@ -45,6 +45,82 @@ fn arguments(fixture: &Fixture) -> Vec<OsString> {
         .to_vec()
 }
 
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn enum_case_edits_invalidate_consumers_and_preserve_independent_reuse() {
+    let fixture = Fixture::enums();
+    let selected = compiler();
+    expect_status(
+        &run(fixture
+            .shuttle("check", &selected)
+            .args(["--target", "wasm32"])),
+        0,
+    );
+    let unchanged = run(fixture
+        .visible_shuttle("check", &selected)
+        .args(["--target", "wasm32"]));
+    expect_status(&unchanged, 0);
+    assert!(!String::from_utf8_lossy(&unchanged.stderr).contains("shuttle: checking"));
+    fixture.write(
+        "models/src/State.co",
+        "enum { _Done, ready, Ready, Added }\n",
+    );
+    let changed = run(fixture
+        .visible_shuttle("check", &selected)
+        .args(["--target", "wasm32"]));
+    expect_status(&changed, 0);
+    let progress = String::from_utf8_lossy(&changed.stderr);
+    assert!(
+        progress.contains("shuttle: checking data-models ")
+            && progress.contains("shuttle: checking app "),
+        "{progress}"
+    );
+    assert!(
+        progress.contains("shuttle: reusing foundation ")
+            && progress.contains("shuttle: reusing tools "),
+        "{progress}"
+    );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn enum_cases_and_constants_are_available_without_dependency_sources() {
+    let fixture = Fixture::enums();
+    let foundation = compile_interface(
+        &fixture,
+        ("foundation", "1.0.0", "core/src"),
+        None,
+        &[],
+        &[],
+    );
+    let models = compile_interface(
+        &fixture,
+        ("data-models", "1.2.3-beta.1+local", "models/src"),
+        None,
+        &[("foundation", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    let tools = compile_interface(
+        &fixture,
+        ("tools", "0.2.0", "tools/src"),
+        None,
+        &[("base", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    for directory in ["core/src", "models/src", "tools/src"] {
+        fs::remove_dir_all(fixture.root.join(directory))
+            .expect("remove temporary dependency sources");
+    }
+    let app = compile_interface(
+        &fixture,
+        ("app", "0.1.0", "app/src"),
+        Some("Main.co"),
+        &[("models", "data-models"), ("tools", "tools")],
+        &[foundation, models, tools],
+    );
+    assert!(app.path.is_file());
+}
+
 fn invoke(fixture: &Fixture, arguments: &[OsString]) -> std::process::Output {
     run(Command::new(compiler())
         .current_dir(&fixture.root)

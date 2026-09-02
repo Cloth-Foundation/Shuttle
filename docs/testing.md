@@ -135,3 +135,17 @@ protocol and eight native cases. All 43 ordinary Shuttle tests, Rust 1.85, Rust
 formatting and Clippy, C++ formatting, and both repositories' whitespace checks
 pass. The Stage 24.2 responsiveness baseline and Stage 24.3 unchanged-build
 coverage remain intact. Stage 24 is complete.
+
+## Stage 25 enum exit audit
+
+Verified on Windows on 2026-09-02. Both compiler development and ASan/UBSan
+configurations pass all 95 CTest entries, including 20 real-compiler protocol
+tests and nine native tests. All 43 ordinary Shuttle tests, formatting, Clippy
+with warnings denied, and the Rust 1.85 baseline pass.
+
+Enum coverage verifies format-2 receipts, every public case spelling,
+source-free imports and static constants, case-edit dependent invalidation,
+independent-package reuse, byte-identical serial/parallel artifacts, and
+whole-project/separate native equivalence. Shuttle continues to treat compiler
+artifacts as opaque. Process protocol 2 and manifest schema 1 are unchanged;
+format-1 packages must be rebuilt. Stage 25 is complete.

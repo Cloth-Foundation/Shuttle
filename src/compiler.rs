@@ -305,7 +305,7 @@ pub fn validate_project_command(
 }
 
 const PROTOCOL_V2: &str = "2";
-const ARTIFACT_FORMAT: u32 = 1;
+const ARTIFACT_FORMAT: u32 = 2;
 const CAPABILITY_LIMIT: usize = 64 * 1024;
 const RECEIPT_LIMIT: usize = 16 * 1024 * 1024;
 const BUILD_STATE_SCHEMA: u32 = 1;
