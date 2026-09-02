@@ -6,14 +6,14 @@ in owning contracts rather than only recorded as completed checkboxes.
 
 ## Stage status
 
-Stages 22 through 25 are complete. Shared verification is
+Stages 22 through 26 are complete. Shared verification is
 documented in `docs/testing.md`.
 
-Stage 26 coordination is active. The approved 26.3 transition is implemented:
+Stage 26 coordination is complete. The approved 26.3 transition is implemented:
 capabilities and receipts require artifact format 3, while the compiler owns
 ABI 4 and runtime ABI 2 compatibility. Older packages must be rebuilt.
-Source-free aggregate tests pass with development and sanitizer compilers;
-the 26.4 equivalence and exit audit remains open.
+The [26.4 exit audit](docs/testing.md#stage-264-struct-exit-audit) passed with
+development and sanitizer compilers on 2026-09-02. No later stage is active.
 
 ## Scheduled work
 
@@ -25,7 +25,7 @@ the 26.4 equivalence and exit audit remains open.
 - [x] Test source-free struct dependencies, private field layouts, aggregate
   parameters/results, GC-bearing nested values and arrays, and constructor/output
   behavior against both compiler configurations.
-- [ ] Verify layout/member edits invalidate consumers while independent packages
+- [x] Verify layout/member edits invalidate consumers while independent packages
   remain reusable, serial/parallel artifacts are byte-identical, and separate
   execution matches whole-project behavior. Complete Rust and shared exit gates.
 

@@ -150,14 +150,102 @@ fn structs_are_available_without_dependency_sources() {
         fs::remove_dir_all(fixture.root.join(directory))
             .expect("remove temporary dependency sources");
     }
+    let artifacts = [foundation, models, tools];
     let app = compile_interface(
         &fixture,
         ("app", "0.1.0", "app/src"),
         Some("Main.co"),
         &[("models", "data-models"), ("tools", "tools")],
-        &[foundation, models, tools],
+        &artifacts,
     );
     assert!(app.path.is_file());
+    let previous = fs::read(&app.path).expect("completed consumer artifact");
+    for body in [
+        "var value = Data(1);",
+        "var value = Data(\"visible\", 1); println(value.tag);",
+        "var value = Data(\"visible\", 1); println(value.hidden());",
+    ] {
+        fixture.write(
+            "app/src/Main.co",
+            &format!("import models::Data;\nstatic func Main() {{ {body} }}\n"),
+        );
+        let (mut command, _) = interface_command(
+            &fixture,
+            ("app", "0.1.0", "app/src"),
+            Some("Main.co"),
+            &[("models", "data-models"), ("tools", "tools")],
+            &artifacts,
+        );
+        let rejected = run(&mut command);
+        expect_status(&rejected, 1);
+        assert!(rejected.stdout.is_empty());
+        let diagnostic = String::from_utf8_lossy(&rejected.stderr);
+        assert!(diagnostic.contains("private"), "{diagnostic}");
+        assert_eq!(fs::read(&app.path).expect("preserved artifact"), previous);
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn struct_interface_artifacts_are_deterministic_and_invalidate_after_edits() {
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let serial = Fixture::structs();
+        let parallel = Fixture::structs();
+        for (fixture, jobs) in [(&serial, "1"), (&parallel, "4")] {
+            let checked = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&checked, 0);
+            assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+        }
+        let directory = format!("app/target/{target}/check/packages");
+        let mut previous = serial.artifact_bytes(&directory);
+        assert_eq!(previous, parallel.artifact_bytes(&directory));
+        for layout in [true, false] {
+            serial.edit_struct(layout);
+            let changed = run(serial
+                .visible_shuttle("check", &selected)
+                .args(["--target", target]));
+            expect_status(&changed, 0);
+            assert!(changed.stdout.is_empty());
+            let progress = String::from_utf8_lossy(&changed.stderr);
+            let current = serial.artifact_bytes(&directory);
+            for package in ["data-models", "app"] {
+                assert!(
+                    progress.contains(&format!("shuttle: checking {package} ")),
+                    "{progress}"
+                );
+                assert_ne!(
+                    previous[package], current[package],
+                    "stale {package} artifact"
+                );
+            }
+            for package in ["foundation", "tools"] {
+                assert!(
+                    progress.contains(&format!("shuttle: reusing {package} ")),
+                    "{progress}"
+                );
+                assert_eq!(
+                    previous[package], current[package],
+                    "unrelated {package} changed"
+                );
+            }
+            let unchanged = run(serial
+                .visible_shuttle("check", &selected)
+                .args(["--target", target]));
+            expect_status(&unchanged, 0);
+            let progress = String::from_utf8_lossy(&unchanged.stderr);
+            assert_eq!(
+                progress.matches("shuttle: reusing ").count(),
+                4,
+                "{progress}"
+            );
+            assert!(!progress.contains("shuttle: checking "), "{progress}");
+            assert_eq!(current, serial.artifact_bytes(&directory));
+            previous = current;
+        }
+    }
 }
 
 fn invoke(fixture: &Fixture, arguments: &[OsString]) -> std::process::Output {
@@ -174,13 +262,13 @@ fn replace(arguments: &mut [OsString], option: &str, value: &str) {
     arguments[position + 1] = value.into();
 }
 
-fn compile_interface(
+fn interface_command(
     fixture: &Fixture,
     package: (&str, &str, &str),
     entry: Option<&str>,
     dependencies: &[(&str, &str)],
     artifacts: &[ProtocolArtifact],
-) -> ProtocolArtifact {
+) -> (Command, PathBuf) {
     let (name, version, source_root) = package;
     let output = fixture.root.join("artifacts").join(format!("{name}.cpa"));
     fs::create_dir_all(output.parent().expect("artifact parent"))
@@ -216,9 +304,20 @@ fn compile_interface(
             artifact.path.clone().into_os_string(),
         ]);
     }
-    let result = run(Command::new(compiler())
-        .current_dir(&fixture.root)
-        .args(arguments));
+    let mut command = Command::new(compiler());
+    command.current_dir(&fixture.root).args(arguments);
+    (command, output)
+}
+
+fn compile_interface(
+    fixture: &Fixture,
+    package: (&str, &str, &str),
+    entry: Option<&str>,
+    dependencies: &[(&str, &str)],
+    artifacts: &[ProtocolArtifact],
+) -> ProtocolArtifact {
+    let (mut command, output) = interface_command(fixture, package, entry, dependencies, artifacts);
+    let result = run(&mut command);
     expect_status(&result, 0);
     assert!(result.stderr.is_empty());
     let receipt: ArtifactReceipt =
@@ -228,7 +327,7 @@ fn compile_interface(
             receipt.package.name.as_str(),
             receipt.package.version.as_str()
         ),
-        (name, version)
+        (package.0, package.1)
     );
     ProtocolArtifact {
         name: receipt.package.name,
