@@ -11,11 +11,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use clap::ValueEnum;
 use fs2::FileExt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::diagnostic::Diagnostic;
 use crate::graph::PackageGraph;
@@ -27,6 +27,111 @@ pub enum ProjectCommand {
     Check,
     Build,
     Run,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProgressMode {
+    Visible,
+    Quiet,
+}
+
+struct BuildProgress {
+    mode: ProgressMode,
+    command: ProjectCommand,
+    target: Target,
+    package_count: usize,
+    started: Instant,
+}
+
+impl BuildProgress {
+    fn start(
+        mode: ProgressMode,
+        command: ProjectCommand,
+        target: Target,
+        package_count: usize,
+    ) -> Self {
+        let progress = Self {
+            mode,
+            command,
+            target,
+            package_count,
+            started: Instant::now(),
+        };
+        progress.write(format_args!(
+            "preparing {} for {} ({} package{})",
+            progress.build_action(),
+            target,
+            package_count,
+            if package_count == 1 { "" } else { "s" }
+        ));
+        progress
+    }
+
+    fn package(&self, index: usize, package: &crate::graph::PackageRecord) {
+        let action = if self.command == ProjectCommand::Check {
+            "checking"
+        } else {
+            "compiling"
+        };
+        self.package_status(action, index, package);
+    }
+
+    fn validating(&self, index: usize, package: &crate::graph::PackageRecord) {
+        self.package_status("validating", index, package);
+    }
+
+    fn reusing(&self, index: usize, package: &crate::graph::PackageRecord) {
+        self.package_status("reusing", index, package);
+    }
+
+    fn package_status(&self, action: &str, index: usize, package: &crate::graph::PackageRecord) {
+        self.write(format_args!(
+            "{action} {} v{} [{}/{}]",
+            package.name,
+            package.version,
+            index + 1,
+            self.package_count
+        ));
+    }
+
+    fn linking(&self, package: &str) {
+        self.write(format_args!("linking {package}"));
+    }
+
+    fn finished(&self) {
+        self.write(format_args!(
+            "finished {} for {} in {}",
+            self.build_action(),
+            self.target,
+            display_duration(self.started.elapsed())
+        ));
+    }
+
+    fn running(&self, output: &Path) {
+        self.write(format_args!("running {}", display_path(output)));
+    }
+
+    fn build_action(&self) -> &'static str {
+        if self.command == ProjectCommand::Check {
+            "check"
+        } else {
+            "build"
+        }
+    }
+
+    fn write(&self, message: std::fmt::Arguments<'_>) {
+        if self.mode == ProgressMode::Visible {
+            eprintln!("shuttle: {message}");
+        }
+    }
+}
+
+fn display_duration(duration: Duration) -> String {
+    if duration < Duration::from_secs(1) {
+        format!("{}ms", duration.as_millis())
+    } else {
+        format!("{:.2}s", duration.as_secs_f64())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -195,6 +300,9 @@ const PROTOCOL_V2: &str = "2";
 const ARTIFACT_FORMAT: u32 = 1;
 const CAPABILITY_LIMIT: usize = 64 * 1024;
 const RECEIPT_LIMIT: usize = 16 * 1024 * 1024;
+const BUILD_STATE_SCHEMA: u32 = 1;
+const BUILD_STATE_LIMIT: u64 = 32 * 1024 * 1024;
+static BUILD_STATE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Deserialize)]
 struct Capabilities {
@@ -207,20 +315,20 @@ struct Capabilities {
     object_targets: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct ReceiptPackage {
     name: String,
     version: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct ReceiptDependency {
     alias: String,
     package: ReceiptPackage,
     artifact_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct ArtifactReceipt {
     schema: u32,
     artifact_format: u32,
@@ -232,10 +340,29 @@ struct ArtifactReceipt {
     dependencies: Vec<ReceiptDependency>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PackageBuildState {
+    schema: u32,
+    manifest: String,
+    receipt: ArtifactReceipt,
+}
+
 #[derive(Clone, Debug)]
 struct ProducedArtifact {
     path: PathBuf,
     receipt: ArtifactReceipt,
+}
+
+struct PackageCompilation<'a> {
+    graph: &'a PackageGraph,
+    target: Target,
+    artifact_kind: &'a str,
+    compiler_id: &'a str,
+    order: &'a [String],
+    artifact_directory: &'a Path,
+    state_directory: &'a Path,
+    progress: &'a BuildProgress,
 }
 
 struct CapturedProcess {
@@ -243,46 +370,6 @@ struct CapturedProcess {
     stdout: Vec<u8>,
     stdout_oversized: bool,
     stderr_nonempty: bool,
-}
-
-struct TemporaryBuildDirectory {
-    path: PathBuf,
-}
-
-impl TemporaryBuildDirectory {
-    fn create() -> Result<Self, ProcessFailure> {
-        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |duration| duration.as_nanos());
-        for _ in 0..16 {
-            let name = format!(
-                "cloth-shuttle-{}-{timestamp}-{}",
-                std::process::id(),
-                SEQUENCE.fetch_add(1, Ordering::Relaxed)
-            );
-            let path = std::env::temp_dir().join(name);
-            match fs::create_dir(&path) {
-                Ok(()) => return Ok(Self { path }),
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
-                Err(error) => {
-                    return Err(process_error(format!(
-                        "could not create private check directory '{}': {error}",
-                        display_path(&path)
-                    )));
-                }
-            }
-        }
-        Err(process_error(
-            "could not allocate a private check directory".to_owned(),
-        ))
-    }
-}
-
-impl Drop for TemporaryBuildDirectory {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
-    }
 }
 
 struct BuildLock {
@@ -328,8 +415,8 @@ impl Drop for BuildLock {
 
 struct BuildWorkspace {
     artifact_directory: PathBuf,
-    _temporary: Option<TemporaryBuildDirectory>,
-    _lock: Option<BuildLock>,
+    state_directory: PathBuf,
+    _lock: BuildLock,
 }
 
 /// Executes protocol-v2 separate package compilation and linking.
@@ -343,12 +430,14 @@ pub fn execute_graph(
     graph: &PackageGraph,
     command: ProjectCommand,
     target: Target,
+    progress_mode: ProgressMode,
 ) -> Result<(), ProcessFailure> {
     if command != ProjectCommand::Check && target != Target::X86_64 {
         return Err(process_error(
             "native executable output currently supports only target 'x86_64'".to_owned(),
         ));
     }
+    let progress = BuildProgress::start(progress_mode, command, target, graph.packages.len());
     let capabilities = query_capabilities(compiler)?;
     validate_capabilities(&capabilities, target, command)?;
     let order = topological_order(graph)?;
@@ -360,18 +449,26 @@ pub fn execute_graph(
     };
     let produced = compile_packages(
         compiler,
-        graph,
-        target,
-        artifact_kind,
-        &capabilities.compiler_id,
-        &order,
-        &workspace.artifact_directory,
+        &PackageCompilation {
+            graph,
+            target,
+            artifact_kind,
+            compiler_id: &capabilities.compiler_id,
+            order: &order,
+            artifact_directory: &workspace.artifact_directory,
+            state_directory: &workspace.state_directory,
+            progress: &progress,
+        },
     )?;
     if command != ProjectCommand::Check {
+        progress.linking(&graph.root_package);
         link_executable(compiler, graph, target, &produced)?;
     }
+    progress.finished();
     if command == ProjectCommand::Run {
-        run_executable(&executable_output(graph, target)?)?;
+        let output = executable_output(graph, target)?;
+        progress.running(&output);
+        run_executable(&output)?;
     }
     Ok(())
 }
@@ -381,14 +478,6 @@ fn create_build_workspace(
     command: ProjectCommand,
     target: Target,
 ) -> Result<BuildWorkspace, ProcessFailure> {
-    if command == ProjectCommand::Check {
-        let temporary = TemporaryBuildDirectory::create()?;
-        return Ok(BuildWorkspace {
-            artifact_directory: temporary.path.clone(),
-            _temporary: Some(temporary),
-            _lock: None,
-        });
-    }
     let root = graph
         .packages
         .get(&graph.root_package)
@@ -396,43 +485,218 @@ fn create_build_workspace(
     let target_directory = windows_compatible_path(&root.package_root)
         .join("target")
         .join(target.to_string());
-    let lock = BuildLock::acquire(&target_directory)?;
-    let artifact_directory = target_directory.join("packages");
+    let workspace_directory = if command == ProjectCommand::Check {
+        target_directory.join("check")
+    } else {
+        target_directory
+    };
+    let lock = BuildLock::acquire(&workspace_directory)?;
+    let artifact_directory = workspace_directory.join("packages");
+    let state_directory = workspace_directory.join(".shuttle").join("state");
     fs::create_dir_all(&artifact_directory).map_err(|error| {
         process_error(format!(
             "could not create package artifact directory '{}': {error}",
             display_path(&artifact_directory)
         ))
     })?;
+    fs::create_dir_all(&state_directory).map_err(|error| {
+        process_error(format!(
+            "could not create build state directory '{}': {error}",
+            display_path(&state_directory)
+        ))
+    })?;
     Ok(BuildWorkspace {
         artifact_directory,
-        _temporary: None,
-        _lock: Some(lock),
+        state_directory,
+        _lock: lock,
     })
+}
+
+fn cached_receipts(
+    state_directory: &Path,
+    package: &crate::graph::PackageRecord,
+) -> Vec<ArtifactReceipt> {
+    let directory = state_directory.join(&package.name);
+    let Ok(entries) = fs::read_dir(directory) else {
+        return Vec::new();
+    };
+    let mut paths = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let file_type = entry.file_type().ok()?;
+            let path = entry.path();
+            (file_type.is_file() && path.extension().is_some_and(|value| value == "json"))
+                .then_some(path)
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
+        .into_iter()
+        .filter_map(|path| {
+            let metadata = fs::metadata(&path).ok()?;
+            if metadata.len() > BUILD_STATE_LIMIT {
+                return None;
+            }
+            let bytes = fs::read(path).ok()?;
+            if u64::try_from(bytes.len()).ok()? > BUILD_STATE_LIMIT {
+                return None;
+            }
+            let state = serde_json::from_slice::<PackageBuildState>(&bytes).ok()?;
+            (state.schema == BUILD_STATE_SCHEMA && state.manifest == package.manifest_contents)
+                .then_some(state.receipt)
+        })
+        .collect()
+}
+
+fn publish_build_state(
+    state_directory: &Path,
+    package: &crate::graph::PackageRecord,
+    receipt: &ArtifactReceipt,
+) -> Result<(), ProcessFailure> {
+    if !valid_digest(&receipt.artifact_id) {
+        return Err(process_error(
+            "refusing to publish build state with an invalid artifact identity".to_owned(),
+        ));
+    }
+    let directory = state_directory.join(&package.name);
+    fs::create_dir_all(&directory).map_err(|error| {
+        process_error(format!(
+            "could not create package build state directory '{}': {error}",
+            display_path(&directory)
+        ))
+    })?;
+    let state = PackageBuildState {
+        schema: BUILD_STATE_SCHEMA,
+        manifest: package.manifest_contents.clone(),
+        receipt: receipt.clone(),
+    };
+    let bytes = serde_json::to_vec(&state)
+        .map_err(|error| process_error(format!("could not encode package build state: {error}")))?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > BUILD_STATE_LIMIT {
+        return Err(process_error(
+            "package build state exceeds its 32 MiB limit".to_owned(),
+        ));
+    }
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_nanos());
+    let sequence = BUILD_STATE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let stem = format!(
+        "{}-{}-{timestamp}-{sequence}",
+        receipt.artifact_id,
+        std::process::id()
+    );
+    let temporary = directory.join(format!(".{stem}.tmp"));
+    let published = directory.join(format!("{stem}.json"));
+    if published.try_exists().map_err(|error| {
+        process_error(format!(
+            "could not inspect build state destination '{}': {error}",
+            display_path(&published)
+        ))
+    })? {
+        return Err(process_error(format!(
+            "build state destination already exists: '{}'",
+            display_path(&published)
+        )));
+    }
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| {
+            process_error(format!(
+                "could not create private build state '{}': {error}",
+                display_path(&temporary)
+            ))
+        })?;
+    let write_result = output.write_all(&bytes).and_then(|()| output.sync_all());
+    drop(output);
+    if let Err(error) = write_result {
+        let _ = fs::remove_file(&temporary);
+        return Err(process_error(format!(
+            "could not write private build state '{}': {error}",
+            display_path(&temporary)
+        )));
+    }
+    if let Err(error) = fs::rename(&temporary, &published) {
+        let _ = fs::remove_file(&temporary);
+        return Err(process_error(format!(
+            "could not atomically publish build state '{}': {error}",
+            display_path(&published)
+        )));
+    }
+
+    if let Ok(entries) = fs::read_dir(&directory) {
+        for entry in entries.filter_map(Result::ok) {
+            let path = entry.path();
+            if path != published
+                && path.extension().is_some_and(|value| value == "json")
+                && entry.file_type().is_ok_and(|file_type| file_type.is_file())
+            {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+    Ok(())
 }
 
 fn compile_packages(
     compiler: &Path,
-    graph: &PackageGraph,
-    target: Target,
-    artifact_kind: &str,
-    compiler_id: &str,
-    order: &[String],
-    artifact_directory: &Path,
+    compilation: &PackageCompilation<'_>,
 ) -> Result<BTreeMap<String, ProducedArtifact>, ProcessFailure> {
     let mut produced = BTreeMap::<String, ProducedArtifact>::new();
-    for package_name in order {
-        let package = graph
+    for (index, package_name) in compilation.order.iter().enumerate() {
+        let package = compilation
+            .graph
             .packages
             .get(package_name)
             .ok_or_else(|| process_error("ordered package is missing".to_owned()))?;
-        let output = artifact_directory.join(format!("{package_name}.cpa"));
-        let arguments = compile_arguments(
-            graph,
+        let output = compilation
+            .artifact_directory
+            .join(format!("{package_name}.cpa"));
+        let cached = cached_receipts(compilation.state_directory, package);
+        if output.is_file() && !cached.is_empty() {
+            compilation.progress.validating(index, package);
+            let arguments = package_arguments(
+                compilation.graph,
+                package_name,
+                compilation.target,
+                compilation.artifact_kind,
+                PackageOperation::Reuse(&output),
+                &produced,
+            )?;
+            if let Some(receipt) = reuse_receipt(compiler, package_name, &arguments)? {
+                validate_compile_receipt(
+                    &receipt,
+                    package,
+                    compilation.artifact_kind,
+                    compilation.target,
+                    compilation.compiler_id,
+                    compilation.graph,
+                    &produced,
+                )?;
+                if cached.contains(&receipt) {
+                    compilation.progress.reusing(index, package);
+                    produced.insert(
+                        package_name.clone(),
+                        ProducedArtifact {
+                            path: output,
+                            receipt,
+                        },
+                    );
+                    continue;
+                }
+            }
+        }
+
+        compilation.progress.package(index, package);
+        let arguments = package_arguments(
+            compilation.graph,
             package_name,
-            target,
-            artifact_kind,
-            &output,
+            compilation.target,
+            compilation.artifact_kind,
+            PackageOperation::Compile(&output),
             &produced,
         )?;
         let captured = invoke_compiler(compiler, &arguments, RECEIPT_LIMIT)?;
@@ -441,10 +705,10 @@ fn compile_packages(
         validate_compile_receipt(
             &receipt,
             package,
-            artifact_kind,
-            target,
-            compiler_id,
-            graph,
+            compilation.artifact_kind,
+            compilation.target,
+            compilation.compiler_id,
+            compilation.graph,
             &produced,
         )?;
         if !output.is_file() {
@@ -453,6 +717,7 @@ fn compile_packages(
                 display_path(&output)
             )));
         }
+        publish_build_state(compilation.state_directory, package, &receipt)?;
         produced.insert(
             package_name.clone(),
             ProducedArtifact {
@@ -465,29 +730,62 @@ fn compile_packages(
     Ok(produced)
 }
 
-fn compile_arguments(
+fn reuse_receipt(
+    compiler: &Path,
+    package: &str,
+    arguments: &[OsString],
+) -> Result<Option<ArtifactReceipt>, ProcessFailure> {
+    let captured = invoke_compiler(compiler, arguments, RECEIPT_LIMIT)?;
+    if captured.status.code() == Some(3) {
+        if captured.stdout_oversized || !captured.stdout.is_empty() || captured.stderr_nonempty {
+            return Err(process_error(format!(
+                "package '{package}', reuse: compiler cache miss polluted its protocol streams"
+            )));
+        }
+        return Ok(None);
+    }
+    require_compiler_success(compiler, package, "reuse", &captured)?;
+    if captured.stderr_nonempty {
+        return Err(process_error(format!(
+            "package '{package}', reuse: compiler success produced unexpected stderr"
+        )));
+    }
+    parse_receipt(&captured.stdout).map(Some)
+}
+
+#[derive(Clone, Copy)]
+enum PackageOperation<'a> {
+    Compile(&'a Path),
+    Reuse(&'a Path),
+}
+
+fn package_arguments(
     graph: &PackageGraph,
     package_name: &str,
     target: Target,
     artifact_kind: &str,
-    output: &Path,
+    operation: PackageOperation<'_>,
     produced: &BTreeMap<String, ProducedArtifact>,
 ) -> Result<Vec<OsString>, ProcessFailure> {
     let package = graph
         .packages
         .get(package_name)
         .ok_or_else(|| process_error("ordered package is missing".to_owned()))?;
+    let (operation_name, path_option, path) = match operation {
+        PackageOperation::Compile(path) => ("compile", "--output", path),
+        PackageOperation::Reuse(path) => ("reuse", "--input", path),
+    };
     let mut arguments = vec![
         OsString::from("--shuttle-protocol"),
         OsString::from(PROTOCOL_V2),
         OsString::from("--operation"),
-        OsString::from("compile"),
+        OsString::from(operation_name),
         OsString::from("--target"),
         OsString::from(target.to_string()),
         OsString::from("--artifact-kind"),
         OsString::from(artifact_kind),
-        OsString::from("--output"),
-        protocol_path_argument(output),
+        OsString::from(path_option),
+        protocol_path_argument(path),
         OsString::from("--package"),
         OsString::from(&package.name),
         OsString::from(package.version.to_string()),
@@ -633,12 +931,14 @@ fn validate_capabilities(
         || !capabilities.protocols.contains(&2)
         || !capabilities.artifact_formats.contains(&ARTIFACT_FORMAT)
         || !valid_digest(&capabilities.compiler_id)
-        || !["compile", "inspect", "link"].iter().all(|required| {
-            capabilities
-                .operations
-                .iter()
-                .any(|value| value == required)
-        })
+        || !["compile", "inspect", "link", "reuse"]
+            .iter()
+            .all(|required| {
+                capabilities
+                    .operations
+                    .iter()
+                    .any(|value| value == required)
+            })
         || !targets.contains(&target_name)
     {
         return Err(process_error(

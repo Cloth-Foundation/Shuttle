@@ -1,6 +1,7 @@
 # Proposal: Shuttle-to-`clothc` protocol version 2
 
-Status: **implemented; Stage 23 completed 2026-09-01**.
+Status: **implemented; Stage 23 completed and Stage 24.3 reuse added
+2026-09-01**.
 
 The compiler's companion proposal is
 [`docs/proposals/stage_23_artifacts.md`](../../../docs/proposals/stage_23_artifacts.md)
@@ -26,7 +27,7 @@ It accepts no other argument and returns one UTF-8 JSON object plus LF, empty
 stderr, and status 0:
 
 ```json
-{"schema":1,"protocols":[1,2],"artifact_formats":[1],"compiler_id":"<64 lowercase hex digits>","operations":["compile","inspect","link"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
+{"schema":1,"protocols":[1,2],"artifact_formats":[1],"compiler_id":"<64 lowercase hex digits>","operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
 ```
 
 The digest placeholder represents the artifact contract's actual compiler
@@ -39,6 +40,10 @@ New Shuttle requires protocol 2 and artifact format 1 for this workflow. A
 missing/malformed query or unsupported required capability fails clearly;
 there is no silent fallback to a whole-project build. Old clients retain v1.
 Tests invoke v1 explicitly as the equivalence oracle.
+
+Stage 24 adds `reuse` to this capability set. Its current-input validation,
+cache-miss status, and persistent-state rules are owned by
+[`stage_24_reuse.md`](stage_24_reuse.md).
 
 ## Compile one package
 
@@ -198,6 +203,8 @@ a source of build inputs; prompts are forbidden.
   a bad selected entry signature.
 - Status `2`: invocation, artifact, protocol, compatibility, filesystem,
   unresolved link definition, output, or native-toolchain failure.
+- Status `3`: only for `reuse`, an empty-stream normal cache miss as defined by
+  the Stage 24 reuse contract.
 - Any other status, signal, or unexpected termination: compiler failure.
 
 Shuttle drains stdout and stderr without deadlock, bounds receipt buffering,
@@ -227,33 +234,33 @@ successfully completed current link operation.
 3. Visit dependencies before consumers, choosing ascending package name among
    ready packages. Stage 23 starts with serial scheduling; graph-independent
    parallel execution is not needed to meet its exit criteria.
-4. Compile each package once and reuse that exact artifact/digest for every
-   consumer in the invocation, including diamond graphs. Never fall back to an
-   old file following a compiler failure.
-5. For `check`, use interface artifacts in an exclusively owned temporary
-   build directory and remove them after completion/failure. Check remains
-   toolchain-independent and leaves no persistent artifact or executable.
+4. Reuse a package only through the Stage 24 validation operation; otherwise
+   compile it once and use that exact artifact/digest for every consumer in the
+   invocation, including diamond graphs. Never fall back to an old file
+   following a compiler failure.
+5. For `check`, use persistent interface artifacts in the selected root's
+   target-specific check workspace. Check remains native-toolchain-independent
+   and never produces an executable.
 6. For `build`/`run`, place object artifacts under the root project's
    `target/x86_64/packages/PACKAGE_NAME.cpa`, then link the existing root
    executable output path. Different manifest packages have distinct names;
    entry filenames and dependency aliases are not artifact filenames.
-7. Remove only temporary files/directories owned by the invocation. Published
-   artifacts from successful earlier nodes may remain after a later failure,
-   but the next command recompiles them; their presence is not freshness proof.
+7. Remove only temporary files/directories owned by the invocation. Artifact
+   presence is never freshness proof; immutable Shuttle state plus successful
+   compiler validation is required before reuse.
 
-Automatic reuse across commands, dependency change detection, caching,
-lockfiles, remote storage, build profiles, and user-supplied precompiled
-dependencies remain deferred. Reusable artifacts mean that a completed package
-can be consumed by multiple independent compiler invocations without source
-access, not that Shuttle has acquired an incremental cache.
+Stage 24 implements local reuse across commands and exact dependency change
+detection as specified in `stage_24_reuse.md`. Lockfiles, remote storage, build
+profiles, and user-supplied precompiled dependencies remain deferred.
 
-Concurrent Shuttle writers to the same root/target output directory must be
-rejected using an exclusive OS-backed build lock held through compilation and
-linking (and executable launch for `run`). Process exit releases the lock;
-crashes must not require deleting stale lock state manually. Checks use their
-private temporary directories and do not lock a persistent output directory.
-Different output roots remain independent. This prevents two otherwise atomic
-builds from exchanging package files or executing each other's result.
+Concurrent Shuttle writers to the same root/target/artifact-kind workspace must
+be rejected using an exclusive OS-backed build lock held through validation,
+compilation, and linking (and executable launch for `run`). Process exit
+releases the lock; crashes must not require deleting stale lock state manually.
+Checks lock their persistent target-specific interface workspace independently
+from native object builds. Different output roots remain independent. This
+prevents two otherwise atomic builds from exchanging package files, state, or
+executables.
 
 ## Compatibility and verification
 

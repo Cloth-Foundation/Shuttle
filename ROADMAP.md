@@ -13,7 +13,7 @@ criteria, concrete work in `TODO.md`, approval of public contracts, and an
 explicit implementation go-ahead.
 
 Stage 22 is complete, including the shared process, native, and sanitizer
-verification. Stage 23 is also complete. No later Shuttle stage is active.
+verification. Stage 23 is also complete. Stage 24 is active.
 
 ## Stage 22: Local projects and compiler build protocol
 
@@ -97,3 +97,41 @@ Exit criteria:
 - independently compiled and reused artifacts produce programs equivalent to
   whole-project compilation, without a source-freshness/cache claim; and
 - shared compiler integration and Shuttle verification suites pass.
+
+## Stage 24: Responsive and observable local builds
+
+Status: **active**
+
+Objective: make local builds visibly active, accelerate clean builds at measured
+bottlenecks, and reuse unchanged verified package artifacts safely.
+
+Prerequisite: Stage 23.
+
+Deliverables:
+
+1. Emit concise package, link, completion, and run progress on standard error,
+   with elapsed timing and no changes to program standard output.
+2. Remove measured cold-path identity and process overhead without weakening
+   the compiler-owned compatibility contract.
+3. Own conservative local incremental state and reuse validated artifacts across
+   commands with exact invalidation and atomic publication.
+4. Schedule independent packages concurrently under a bounded job count while
+   retaining deterministic outputs and diagnostics.
+
+Non-goals:
+
+- compiler-internal incremental compilation, a daemon, or watch mode;
+- shared, remote, or distributed caches;
+- remote dependencies, registries, or package publication; and
+- timestamp-only freshness decisions or unvalidated artifact reuse.
+
+Exit criteria:
+
+- long operations are preceded by stable progress and successful `run` program
+  streams remain unchanged;
+- the recorded small-project clean build is materially faster;
+- unchanged builds compile no packages and all declared invalidation inputs are
+  covered by tests;
+- single-job and parallel builds are byte- and diagnostic-equivalent; and
+- Rust, shared compiler, development, sanitizer, native, and responsiveness
+  suites pass.

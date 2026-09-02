@@ -147,6 +147,37 @@ fn builds_and_runs_only_the_selected_root_entry() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn native_build_reuses_unchanged_packages_and_repairs_a_corrupt_candidate() {
+    let fixture = Fixture::new();
+    let selected_compiler = compiler();
+    expect_status(&run(&mut fixture.shuttle("build", &selected_compiler)), 0);
+
+    let unchanged = run(&mut fixture.visible_shuttle("build", &selected_compiler));
+    expect_status(&unchanged, 0);
+    let progress = String::from_utf8(unchanged.stderr).expect("reuse progress");
+    assert_eq!(progress.matches("shuttle: reusing").count(), 4);
+    assert!(!progress.contains("shuttle: compiling"));
+
+    let foundation = fixture
+        .root
+        .join("app/target/x86_64/packages/foundation.cpa");
+    let mut bytes = fs::read(&foundation).expect("foundation artifact");
+    *bytes.last_mut().expect("artifact byte") ^= 1;
+    fs::write(&foundation, bytes).expect("corrupt candidate");
+    let repaired = run(&mut fixture.visible_shuttle("build", &selected_compiler));
+    expect_status(&repaired, 0);
+    let progress = String::from_utf8(repaired.stderr).expect("repair progress");
+    assert!(progress.contains("shuttle: compiling foundation "));
+    for package in ["data-models", "tools", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: reusing {package} ")),
+            "unchanged consumer was not reused: {progress}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
 fn separate_and_whole_project_programs_are_equivalent() {
     let whole = Fixture::from_fixture("equivalence_graph", "whole project");
     let separate = Fixture::from_fixture("equivalence_graph", "separate project");
