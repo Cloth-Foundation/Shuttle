@@ -44,6 +44,59 @@ impl Fixture {
         }
     }
 
+    pub fn structs() -> Self {
+        let fixture = Self::new();
+        fixture.write(
+            "models/src/Data.co",
+            r"
+struct {
+  byte tag = 1;
+  string Text;
+  uint64 CountTo;
+  Data(string text, uint64 countTo) { Text = text; CountTo = countTo; }
+  func Copy(): Data { return self; }
+  static func Change(Data data): Data { data.CountTo += 1; return data; }
+}
+",
+        );
+        fixture.write(
+            "models/src/Packet.co",
+            r#"
+struct {
+  Data Value;
+  string Tail;
+  Packet(Data value) { Value = value; Tail = "tail"; }
+  func Copy(): Packet { return self; }
+}
+"#,
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r#"
+import models::Data;
+import models::Packet;
+static func Main() {
+  var data = Data("alive", 100);
+  var changed = Data.Change(data);
+  var packet = Packet(data);
+  var copied = packet.Copy();
+  Packet[] values = [packet, copied];
+  values[0].Value.CountTo++;
+  for (var item in values) { item.Value.CountTo = 0; }
+  for (int32 i = 0; i < 10000; i++) { var garbage = "unused" + " allocation"; }
+  println(data.CountTo);
+  println(changed.CountTo);
+  println(packet == copied);
+  println(values[0].Value.CountTo);
+  println(values[1].Value.Text);
+  println(packet);
+  println(copied::typeName);
+}
+"#,
+        );
+        fixture
+    }
+
     pub fn manifest(&self) -> PathBuf {
         self.root.join("app/Shuttle.toml")
     }

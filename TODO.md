@@ -9,7 +9,25 @@ in owning contracts rather than only recorded as completed checkboxes.
 Stages 22 through 25 are complete. Shared verification is
 documented in `docs/testing.md`.
 
+Stage 26 coordination is active. The approved 26.3 transition is implemented:
+capabilities and receipts require artifact format 3, while the compiler owns
+ABI 4 and runtime ABI 2 compatibility. Older packages must be rebuilt.
+Source-free aggregate tests pass with development and sanitizer compilers;
+the 26.4 equivalence and exit audit remains open.
+
 ## Scheduled work
+
+### Stage 26: Aggregate artifact compatibility
+
+- [x] Coordinate the compiler's approved struct/ABI contract and require the
+  reviewed artifact version in capabilities and receipts. Preserve process
+  protocol 2, manifest schema 1, opaque artifact handling, and exact reuse checks.
+- [x] Test source-free struct dependencies, private field layouts, aggregate
+  parameters/results, GC-bearing nested values and arrays, and constructor/output
+  behavior against both compiler configurations.
+- [ ] Verify layout/member edits invalidate consumers while independent packages
+  remain reusable, serial/parallel artifacts are byte-identical, and separate
+  execution matches whole-project behavior. Complete Rust and shared exit gates.
 
 ### Stage 25: Enum artifact compatibility
 
