@@ -16,7 +16,27 @@ Stage 22 is complete, including the shared process, native, and sanitizer
 verification. Stages 23 through 26 are also complete, including the approved
 aggregate compatibility transition and the coordinated equivalence and exit
 audit. The coordinated 26.5.1 override follow-up is also complete. The compiler
-roadmap owns the language and ABI contracts; no further stage is activated.
+roadmap owns the language and ABI contracts. Stage 27 coordination is complete;
+the approved switch contract and its shared exit audit passed on 2026-09-02.
+
+## Stage 27: Switch keyword and dependency-evolution coordination
+
+Status: **complete — coordinated 27.4 exit audit passed 2026-09-02**
+
+The [exit audit](docs/testing.md#stage-274-switch-exit-audit) verifies source-free
+case/constant evolution, consumer invalidation, stale-link rejection, preserved
+outputs, and relocated serial/parallel equivalence with both compilers.
+
+The compiler owns switch syntax, exhaustive enum checking, and lowering. Shuttle
+work is limited to matching the new `switch`/`case`/`default` dependency-alias
+restrictions and verifying source-free enum/scalar constants, dependency edits,
+failed-output preservation, and whole/separate/serial/parallel behavior.
+Package-name grammar, opaque artifact ownership, and scheduling remain unchanged.
+
+Prerequisite satisfied: compiler Stage 27 contract and implementation approval.
+No artifact/ABI/process/receipt/manifest revision is expected; coordinate
+any separately approved change before implementing it. Exit requires the
+compiler's development/sanitizer audit plus Rust and shared protocol/native gates.
 
 ## Stage 26.5.1: Explicit interface-override compatibility
 
