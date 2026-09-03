@@ -15,7 +15,8 @@ use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
 use support::{
-    Fixture, STRUCT_OUTPUT, SWITCH_CASES, SWITCH_MAIN, SWITCH_OUTPUT, compiler, expect_status, run,
+    CHECKED_UPDATES_OUTPUT, Fixture, STRUCT_OUTPUT, SWITCH_CASES, SWITCH_MAIN, SWITCH_OUTPUT,
+    compiler, expect_status, run,
 };
 
 #[derive(Clone, Debug)]
@@ -108,6 +109,90 @@ fn structs_preserve_relocated_serial_parallel_artifacts() {
     expect_status(&whole, 0);
     assert_eq!(whole.stdout, STRUCT_OUTPUT);
     assert!(whole.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn checked_updates_cross_whole_separate_and_source_free_packages() {
+    let serial = Fixture::checked_updates();
+    let parallel = Fixture::checked_updates();
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, CHECKED_UPDATES_OUTPUT);
+    assert_eq!(second.stdout, first.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, CHECKED_UPDATES_OUTPUT);
+    assert!(whole.stderr.is_empty());
+    let source_free = source_free_run(&serial);
+    expect_status(&source_free, 0);
+    assert_eq!(source_free.stdout, CHECKED_UPDATES_OUTPUT);
+    assert!(source_free.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn checked_update_edits_invalidate_only_affected_packages() {
+    let fixture = Fixture::checked_updates();
+    let selected = compiler();
+    expect_status(&run(&mut fixture.shuttle("build", &selected)), 0);
+    let directory = "app/target/x86_64/packages";
+    let previous = fixture.artifact_bytes(directory);
+    let executable = fixture.root.join(format!(
+        "app/target/x86_64/app{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let model_path = fixture.root.join("models/src/User.co");
+    let model = fs::read_to_string(&model_path).expect("checked model source");
+    let equivalent = model.replace("value *= 2;", "value += value;");
+    assert_ne!(model, equivalent);
+    fixture.write("models/src/User.co", &equivalent);
+    let rebuilt = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&rebuilt, 0);
+    assert_eq!(rebuilt.stdout, CHECKED_UPDATES_OUTPUT);
+    let progress = String::from_utf8_lossy(&rebuilt.stderr);
+    let current = fixture.artifact_bytes(directory);
+    for package in ["data-models", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: compiling {package} ")),
+            "{progress}"
+        );
+        assert_ne!(previous[package], current[package]);
+    }
+    for package in ["foundation", "tools"] {
+        assert!(
+            progress.contains(&format!("shuttle: reusing {package} ")),
+            "{progress}"
+        );
+        assert_eq!(previous[package], current[package]);
+    }
+    let completed = fs::read(&executable).expect("completed executable");
+
+    let invalid = equivalent.replace("value += Record.Value();", "value += Missing;");
+    assert_ne!(equivalent, invalid);
+    fixture.write("models/src/User.co", &invalid);
+    let failed = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&failed, 1);
+    assert!(
+        failed.stdout.is_empty(),
+        "failed build ran a stale executable"
+    );
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("Missing"));
+    assert_eq!(
+        fs::read(&executable).expect("preserved executable"),
+        completed
+    );
+    assert_eq!(fixture.artifact_bytes(directory), current);
 }
 
 #[test]

@@ -1,5 +1,65 @@
 # Shuttle verification
 
+## Coordinated 29.4 checked runtime arithmetic exit audit
+
+Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.
+Each compiler passes all **28 public compiler-protocol and 22 native Shuttle
+tests** inside its **186/186 CTest** run. All **43 ordinary Rust tests**, Rust
+1.85 checking, formatting, Clippy with warnings denied, and six compiler-backed
+editor tests per compiler pass. C++ formatting and repository whitespace checks
+also pass.
+
+The shared 29.3 package matrix remains green for whole, separate, and
+source-free native execution; runtime-ABI-2 rejection; affected-only
+invalidation; unrelated reuse; output preservation; stale-run prevention; and
+relocated serial/parallel artifact determinism on x86-64 and wasm32. The compiler
+owns the expanded width, endpoint, exact-runtime-failure, and malformed-model
+coverage completed in 29.4.
+
+**Stage 29 coordination is complete.** Shuttle required no production,
+capability, receipt, process, manifest, or scheduler change. Runtime ABI 3
+remains opaque compiler-owned artifact metadata; no later Shuttle stage is
+assigned or active.
+
+## Coordinated 29.3 checked update integration checkpoint
+
+Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.
+Each compiler passes all **28 public compiler-protocol and 22 native tests**
+inside its **182/182 CTest** run. All **43 ordinary Rust tests**, Rust 1.85
+checking, formatting, Clippy with warnings denied, and six compiler-backed editor
+tests per compiler pass.
+
+The checked-update fixture exercises prefix/postfix and every arithmetic compound
+through dependency object code. Whole-project, separate-package, and source-free
+native runs agree. Serial and parallel builds at relocated roots produce identical
+package artifacts for x86-64 and wasm32. A checked-arithmetic dependency edit
+rebuilds it and its consumer while unrelated packages retain exact bytes; an
+invalid follow-up preserves completed package/executable bytes and does not run
+the stale executable.
+
+Runtime ABI remains opaque to Shuttle. Existing compiler-owned runtime-ABI-2
+rejection and artifact integrity checks remain authoritative; no capability,
+receipt, process, manifest, scheduler, or production Shuttle behavior changed.
+
+At the coordinated 29.3 checkpoint, Stage 29 remained active for the separately
+authorized 29.4 exit audit recorded above.
+
+## Compiler 29.2 checked integer lowering checkpoint
+
+Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.
+Each passes all **27 public compiler-protocol and 20 native tests** inside its
+**166/166 CTest** run. All **43 ordinary Rust tests**, Rust 1.85 checking,
+formatting, Clippy with warnings denied, and six compiler-backed editor tests
+per compiler also pass.
+
+The compiler now emits runtime-ABI-3 artifacts and rejects re-signed
+runtime-ABI-2 metadata. Shuttle requires no production change: runtime ABI is
+not present in public capabilities or receipts, artifacts remain opaque, and
+`clothc` validates compatibility during inspect, reuse, and link. Artifact
+format 4, compiler ABI 4, process protocol 2, receipt schema 1, and manifest
+schema 1 remain unchanged. Update/compound and broader separate-compilation
+coverage remains scheduled for 29.3.
+
 ## Stage 28.4 scalar constant exit audit
 
 Verified on Windows on 2026-09-02 with development and ASan/UBSan compilers:

@@ -14,6 +14,7 @@ pub struct Fixture {
 }
 
 pub const STRUCT_OUTPUT: &[u8] = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n100\n101\n104\ninitial\n";
+pub const CHECKED_UPDATES_OUTPUT: &[u8] = b"7\n22\n1\n21\n42\n";
 pub const SWITCH_OUTPUT: &[u8] =
     b"ready\nready\nactive\nfallback\ndone\nfallback\nsmall\nother\nmaximum\n";
 pub const SWITCH_CASES: &[&str] = &["Ready", "ready", "_Done"];
@@ -278,6 +279,58 @@ static func Main() {
   println(processor.Initial.Value.Text);
 }
 "#,
+        );
+        fixture
+    }
+
+    pub fn checked_updates() -> Self {
+        let fixture = Self::new();
+        fixture.write(
+            "models/src/User.co",
+            r"
+import foundation.data::Record;
+int32 Calls;
+int32 Value;
+User(int32 value) { Calls = 0; Value = value; }
+func Target(): User { Calls++; return self; }
+static func Step(int32 value): int32 {
+  value++;
+  value += Record.Value();
+  value *= 2;
+  value -= 2;
+  value /= 2;
+  value %= 23;
+  return value;
+}
+",
+        );
+        fixture.write(
+            "tools/src/Helper.co",
+            r"
+import base.data::Record;
+static func Adjust(int32 value): int32 {
+  value--;
+  value += Record.Value();
+  return value;
+}
+",
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r"
+import models::User as ModelUser;
+import tools::Helper;
+static func Main() {
+  println(ModelUser.Step(10));
+  println(Helper.Adjust(3));
+  ModelUser user = ModelUser(7);
+  user.Target().Value *= 3;
+  println(user.Calls);
+  println(user.Value);
+  int32 local = 40;
+  println(++local + local++ - 40);
+}
+",
         );
         fixture
     }
