@@ -19,6 +19,52 @@ audit. The coordinated 26.5.1 override follow-up is also complete. The compiler
 roadmap owns the language and ABI contracts. Stage 27 coordination is complete;
 the approved switch contract and its shared exit audit passed on 2026-09-02.
 
+Stage 28 coordination is complete, including the separately authorized
+[28.4 exit audit](docs/testing.md#stage-284-scalar-constant-exit-audit) on
+2026-09-02. Format-4 integration, source-free values, dependency evolution,
+output preservation, and deterministic builds pass with both compilers.
+No later stage is active or assigned.
+
+## Stage 28: Scalar-constant artifact coordination
+
+Status: **complete — coordinated 28.4 exit audit passed 2026-09-02**
+
+Objective: consume the compiler's reviewed scalar-constant artifact contract and
+verify computed values, dependency evolution, and whole/separate/source-free
+equivalence through the existing public process boundary.
+
+Prerequisites satisfied: completed Stage 27 and approval of the compiler's
+concrete Stage 28 source/evaluation/format contract. Compiler 28.2 was authorized;
+the separate 28.3 integration and 28.4 audit go-aheads were received on
+2026-09-02. The compiler owns the approved contract in
+`docs/proposals/stage_28_scalar_constants.md` in its checkout.
+
+The approved contract requires artifact format **4** because format 3 cannot
+represent negative signed static constants. Compiler ABI **4**, runtime ABI **2**, process
+protocol **2**, receipt schema **1**, and manifest schema **1** remain unchanged.
+Capabilities/receipts require format 4. Old artifacts must be rebuilt,
+not interpreted under the new format. No expression trees enter the protocol.
+
+Deliverables:
+
+1. Record the dependency and compatibility review without changing behavior.
+2. Coordinate format requirements, compiler capability/receipt validation,
+   fixtures, old-format diagnostics, and documentation with compiler 28.3.
+3. Verify negative and computed scalar constants, private/public dependencies,
+   nominal enums, and switch references without reopening dependency sources.
+4. Prove constant/dependency edits invalidate affected consumers, stale links
+   fail, failures preserve output and never run stale programs, and relocated
+   serial/parallel artifacts and native execution remain equivalent.
+
+Non-goals: parsing/evaluating Cloth expressions, decoding private compiler
+metadata, new manifest or process fields, new cache/scheduling policy, runtime
+initialization, remote dependencies, or unrelated language/tooling features.
+
+Exit requires all Stage 28 work items plus ordinary Rust quality gates and
+shared protocol/native tests with both development and sanitizer compilers.
+Compiler/source semantics and editor/user-language documentation remain compiler
+stage responsibilities. Further format/ABI deviations require separate review.
+
 ## Stage 27: Switch keyword and dependency-evolution coordination
 
 Status: **complete — coordinated 27.4 exit audit passed 2026-09-02**

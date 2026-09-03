@@ -47,6 +47,119 @@ fn arguments(fixture: &Fixture) -> Vec<OsString> {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST"]
+fn computed_constants_have_deterministic_artifacts_and_failure_order() {
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let serial = Fixture::constants();
+        let parallel = Fixture::constants();
+        parallel.reverse_dependencies();
+        let directory = format!("app/target/{target}/check/packages");
+        let mut failures = Vec::new();
+        for (fixture, jobs, reverse) in [(&serial, "1", false), (&parallel, "4", true)] {
+            let checked = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&checked, 0);
+            assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+            let previous = fixture.artifact_bytes(&directory);
+            let mut files = [
+                (
+                    "models/src/First.co",
+                    "static final int32 A = Last.Z; static final int32 unused = 1 / 0;",
+                ),
+                ("models/src/Last.co", "static final int32 Z = First.A;"),
+            ];
+            if reverse {
+                files.reverse();
+            }
+            for (path, source) in files {
+                fixture.write(path, source);
+            }
+            let failed = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&failed, 1);
+            assert!(failed.stdout.is_empty());
+            let detail = String::from_utf8(failed.stderr).unwrap();
+            assert!(
+                detail.contains("cyclic static constant") && detail.contains("by zero"),
+                "{detail}"
+            );
+            failures.push(detail.replace(
+                &fixture.root.to_string_lossy().replace('\\', "/"),
+                "<project>",
+            ));
+            assert_eq!(previous, fixture.artifact_bytes(&directory));
+        }
+        assert_eq!(
+            serial.artifact_bytes(&directory),
+            parallel.artifact_bytes(&directory)
+        );
+        assert_eq!(failures[0], failures[1]);
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn computed_constants_enforce_source_free_access_types_and_switch_labels() {
+    let fixture = Fixture::constants();
+    let artifacts = compile_switch_dependencies(&fixture);
+    let app = compile_interface(
+        &fixture,
+        ("app", "0.1.0", "app/src"),
+        Some("Main.co"),
+        &[("models", "data-models"), ("tools", "tools")],
+        &artifacts,
+    );
+    let completed = fs::read(&app.path).unwrap();
+    for package in ["core", "models", "tools"] {
+        fs::rename(
+            fixture.root.join(package).join("src"),
+            fixture.root.join(package).join("hidden-source"),
+        )
+        .unwrap();
+    }
+    for (source, diagnostic) in [
+        ("static final int32 Value = Values.hidden;", "private"),
+        (
+            "static final int8 Value = Values.Answer;",
+            "expected 'int8'",
+        ),
+        (
+            "static final int64 Value = Values.Answer + 2; static func Check(int64 n) { switch(n) { case Value: {} case 44: {} } }",
+            "duplicate switch case",
+        ),
+        (
+            "static final bool Value = true || Value;",
+            "cyclic static constant",
+        ),
+        (
+            "static func Check(int64 n) { switch(n) { case Values.Quarter: {} } }",
+            "case constant of type 'float32'",
+        ),
+    ] {
+        fixture.write(
+            "app/src/Main.co",
+            &format!("import models::Constants as Values;\n{source}\nstatic func Main() {{}}\n"),
+        );
+        let (mut command, _) = interface_command(
+            &fixture,
+            ("app", "0.1.0", "app/src"),
+            Some("Main.co"),
+            &[("models", "data-models"), ("tools", "tools")],
+            &artifacts,
+        );
+        let failed = run(&mut command);
+        expect_status(&failed, 1);
+        assert!(failed.stdout.is_empty());
+        let detail = String::from_utf8_lossy(&failed.stderr);
+        assert!(detail.contains(diagnostic), "{detail}");
+        assert_eq!(completed, fs::read(&app.path).unwrap());
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
 fn switch_interface_artifacts_and_diagnostics_are_deterministic() {
     let selected = compiler();
     for target in ["x86_64", "wasm32"] {
@@ -1134,6 +1247,72 @@ fn failed_emission_preserves_completed_outputs_and_creates_no_partial_file() {
     *args.last_mut().expect("output argument") = missing.clone().into_os_string();
     expect_status(&invoke(&fixture, &args), 2);
     assert!(!missing.exists());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn computed_constants_emit_and_preserve_outputs_on_failure() {
+    let fixture = Fixture::new();
+    let source = fixture.root.join("constants/Main.co");
+    for initializer in ["6 * 7", "int8(-128)", "Next", "false && (1 / 0 == 0)"] {
+        let ty = if initializer.starts_with("false") {
+            "bool"
+        } else {
+            "int32"
+        };
+        fixture.write("constants/Main.co", &format!(
+            "static final {ty} Value = {initializer}; static final int32 Next = 42; static func Main() {{ println(Value); }}\n"
+        ));
+        for target in ["x86_64", "wasm32"] {
+            let output = run(Command::new(compiler())
+                .args(["--emit-llvm", &format!("--target={target}")])
+                .arg(&source));
+            expect_status(&output, 0);
+            assert!(output.stderr.is_empty());
+            let ir = String::from_utf8(output.stdout).expect("LLVM IR");
+            assert!(ir.contains("constant i"));
+            assert!(
+                !ir.contains("_C1I"),
+                "static constant generated an initializer"
+            );
+        }
+        let artifact = compile_interface(
+            &fixture,
+            ("constants", "1.0.0", "constants"),
+            Some("Main.co"),
+            &[],
+            &[],
+        );
+        let previous = fs::read(&artifact.path).expect("completed artifact");
+        fixture.write(
+            "constants/Main.co",
+            "static final int32 Bad = 1 / 0; static func Main() {}\n",
+        );
+        for mode in ["--emit-llvm=", "--build="] {
+            let output = fixture.root.join("completed output");
+            fs::write(&output, b"completed output").expect("seed output");
+            let mut option = OsString::from(mode);
+            option.push(&output);
+            let failed = run(Command::new(compiler()).arg(option).arg(&source));
+            expect_status(&failed, 1);
+            assert!(String::from_utf8_lossy(&failed.stderr).contains("by zero"));
+            assert_eq!(
+                fs::read(output).expect("preserved output"),
+                b"completed output"
+            );
+        }
+        let (mut command, output) = interface_command(
+            &fixture,
+            ("constants", "1.0.0", "constants"),
+            Some("Main.co"),
+            &[],
+            &[],
+        );
+        let failed = run(&mut command);
+        expect_status(&failed, 1);
+        assert!(failed.stdout.is_empty());
+        assert_eq!(fs::read(output).expect("preserved artifact"), previous);
+    }
 }
 
 #[test]

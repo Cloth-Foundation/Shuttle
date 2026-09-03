@@ -62,6 +62,66 @@ impl Fixture {
         fixture
     }
 
+    pub fn constants() -> Self {
+        let fixture = Self::new();
+        fixture.write(
+            "core/src/Seed.co",
+            r"
+static final int16 Base = 3 * 7;
+static final float32 Half = 1.0 / 2.0;
+",
+        );
+        fixture.write("models/src/State.co", "enum { Ready, Done }\n");
+        fixture.write(
+            "models/src/Constants.co",
+            r"
+import foundation::Seed as Input;
+static final int32 hidden = Input.Base;
+static final int64 Answer = hidden * 2;
+static final int8 Minimum = int8(-128);
+static final int64 SignedMinimum = -9223372036854775808;
+static final uint64 Maximum = uint64(0) - uint64(0) | 18446744073709551615;
+static final State initial = State.Ready;
+static final State Initial = initial;
+static final float32 Quarter = Input.Half * Input.Half;
+static final float64 Wide = Quarter + 1.0;
+static final float32 Zero = -0.0;
+static final float32 Tiny = 0.000000000000000000000000000000000000000000001;
+static final bool Enabled = false && (1 / 0 == 0) || Answer == 42;
+static final char Letter = 'Q';
+",
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r#"
+import models::Constants as Values;
+import models::State as Status;
+static final int64 Answer = Values.Answer;
+static final float32 Copy = Values.Tiny + 0.0;
+static func Main() {
+  println(Answer);
+  println(Values.Minimum);
+  println(Values.SignedMinimum);
+  println(Values.Maximum);
+  println(Values.Quarter == 0.25);
+  println(Values.Wide == 1.25);
+  println(Values.Enabled);
+  println(Values.Letter);
+  println(Values.Tiny > 0.0);
+  println(Copy == Values.Tiny);
+  println(Values.Zero == 0.0);
+  switch (Values.SignedMinimum) { case Values.SignedMinimum: { println("minimum"); } }
+  switch (Values.Maximum) { case Values.Maximum: { println("maximum"); } }
+  switch (Values.Initial) {
+    case Values.Initial: { println("ready"); }
+    case Status.Done: { println("done"); }
+  }
+}
+"#,
+        );
+        fixture
+    }
+
     pub fn switches() -> Self {
         let fixture = Self::new();
         fixture.write_switch_model(SWITCH_CASES, "ready", 7);

@@ -10,7 +10,7 @@ Stages 22 through 26 are complete. Shared verification is
 documented in `docs/testing.md`.
 
 Stage 26 coordination is complete. The approved 26.3 transition is implemented:
-capabilities and receipts require artifact format 3, while the compiler owns
+that checkpoint introduced artifact format 3, while the compiler owns
 ABI 4 and runtime ABI 2 compatibility. Older packages must be rebuilt.
 The [26.4 exit audit](docs/testing.md#stage-264-struct-exit-audit) passed with
 development and sanitizer compilers on 2026-09-02. Stage 26.5.1 coordinated
@@ -21,7 +21,51 @@ Stage 27 coordination is complete following approval and verification through
 closes keyword policy, source-free execution, dependency evolution, and
 determinism. No compiler protocol changes or later stages are introduced.
 
+Stage 28 coordination is complete following the separately authorized
+[28.4 exit audit](docs/testing.md#stage-284-scalar-constant-exit-audit) on
+2026-09-02. Format-4 integration, source-free values, dependency evolution,
+output preservation, and determinism are verified. No later stage is active.
+
 ## Scheduled work
+
+### Stage 28: Scalar-constant artifact coordination
+
+- [x] Record the compiler-owned draft and compatibility boundary in the roadmap.
+  Format 3 cannot encode negative signed constants; proposed format 4 leaves
+  the physical ABI/runtime and process/receipt/manifest versions unchanged.
+- [x] Record approval of the concrete contract, including artifact format 4,
+  on 2026-09-02.
+- [x] Verify the 28.2 direct-check/emission boundary through the public CLI and
+  process protocol. New constant forms preserve previous LLVM/native/interface
+  outputs when emission fails; no Shuttle format or production behavior changes.
+- [x] Obtain the separate coordinated implementation go-ahead (2026-09-02).
+- [x] During compiler 28.3, require the reviewed format in capabilities/receipts;
+  update fixtures, diagnostics, and docs together with the compiler reader/writer.
+  Reject old artifacts and retain exact compiler, target, and dependency checks.
+- [x] Verify source-free negative/computed constants, cross-package constant
+  chains, public values derived from private constants without granting private
+  access, aliases, and nominal integer/enum switch-label behavior.
+  Completed 2026-09-02 with 25 protocol and 17 native tests against both compiler
+  configurations, plus all ordinary Rust and tool-quality gates. See
+  [the checkpoint record](docs/testing.md#compiler-283-constant-integration-checkpoint).
+
+- [x] Test value/source edits and invalid constants: affected consumer rebuilds,
+  unrelated-package reuse, changed coverage/duplicate labels, stale-link refusal,
+  preserved outputs, and no stale program execution after failed `run`.
+- [x] Prove relocated serial/parallel interface/native artifact determinism and
+  whole/separate/source-free execution equivalence. Keep target-specific artifact
+  comparisons separate from the compiler's cross-target scalar-bit tests.
+- [x] Pass Rust formatting, Clippy, ordinary tests, Rust 1.85 checking, and shared
+  protocol/native suites with both compiler configurations. Record the 28.4 exit
+  audit without duplicating language rules or interpreting compiler metadata.
+
+Completed 2026-09-02: all 27 shared protocol and 20 native tests pass against
+both compilers, alongside 43 ordinary Rust tests and all Rust quality gates.
+Same-value source edits still invalidate dependency digests; private-value and
+transitive edits propagate, unrelated packages reuse, invalid constants and
+duplicate labels preserve outputs, and stale links fail. Relocated one/four-job
+artifacts match within each target; native executables match across a PE timestamp
+boundary. See the [exit record](docs/testing.md#stage-284-scalar-constant-exit-audit).
 
 ### Stage 27: Switch keyword and dependency-evolution coordination
 
