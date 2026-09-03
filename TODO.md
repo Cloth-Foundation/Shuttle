@@ -24,9 +24,44 @@ determinism. No compiler protocol changes or later stages are introduced.
 Stage 28 coordination is complete following the separately authorized
 [28.4 exit audit](docs/testing.md#stage-284-scalar-constant-exit-audit) on
 2026-09-02. Format-4 integration, source-free values, dependency evolution,
-output preservation, and determinism are verified. No later stage is active.
+output preservation, and determinism are verified. Stage 29 coordination is
+complete following the separately authorized
+[29.4 exit audit](docs/testing.md#coordinated-294-checked-runtime-arithmetic-exit-audit)
+on 2026-09-03. No later Shuttle stage is assigned or active.
 
 ## Scheduled work
+
+### Stage 29: Checked-arithmetic runtime ABI coordination
+
+- [x] Record approval of the compiler-owned Stage 29 source/failure/lowering
+  contract and runtime ABI 3. Approved 2026-09-03.
+- [x] With compiler 29.2, verify the compiler-owned runtime-ABI-3 artifact
+  transition and runtime-ABI-2 rejection through the existing opaque boundary.
+  Runtime ABI is not exposed in Shuttle capabilities, receipts, or stubs, so
+  their schemas remain unchanged alongside artifact format 4, compiler ABI 4,
+  and all process/manifest schema versions.
+- [x] Verify direct/update/compound arithmetic through the public compiler
+  protocol without parsing language expressions or object payloads in Shuttle.
+- [x] Prove runtime-ABI-2 rejection, affected dependency invalidation, unrelated
+  reuse, completed-output preservation, and no stale execution after failures.
+- [x] Prove relocated serial/parallel artifact determinism and whole/separate/
+  source-free native equivalence with both compiler configurations; pass Rust
+  formatting, Clippy, ordinary tests, and Rust 1.85 checking.
+
+  Completed 2026-09-03. The checked-update fixture passes whole, separate, and
+  source-free native execution, preserves unaffected artifacts and completed
+  output across valid/invalid dependency edits, and produces identical serial/
+  parallel artifacts for both targets. The compiler remains the sole owner of
+  runtime-ABI validation and arithmetic semantics.
+
+- [x] Complete the coordinated 29.4 exit audit against both compiler
+  configurations, including all shared protocol/native, ordinary Rust, Rust
+  1.85, formatting, Clippy, editor, and repository gates.
+
+  Completed 2026-09-03. Each compiler passes 28 public protocol and 22 native
+  Shuttle cases inside its 186-test compiler run. Shuttle required no production
+  or schema change and continues to treat runtime ABI as opaque compiler-owned
+  artifact metadata.
 
 ### Stage 28: Scalar-constant artifact coordination
 

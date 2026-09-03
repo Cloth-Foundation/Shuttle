@@ -23,7 +23,36 @@ Stage 28 coordination is complete, including the separately authorized
 [28.4 exit audit](docs/testing.md#stage-284-scalar-constant-exit-audit) on
 2026-09-02. Format-4 integration, source-free values, dependency evolution,
 output preservation, and deterministic builds pass with both compilers.
-No later stage is active or assigned.
+Stage 29 coordination is complete following the separately authorized
+[29.4 exit audit](docs/testing.md#coordinated-294-checked-runtime-arithmetic-exit-audit)
+on 2026-09-03. The compiler/runtime transition and every coordinated verification
+gate pass.
+
+## Stage 29: Checked-arithmetic runtime ABI coordination
+
+Status: **complete — coordinated 29.4 exit audit passed 2026-09-03**
+
+The compiler's `docs/proposals/stage_29_checked_runtime_arithmetic.md` proposal
+defines checked runtime integer arithmetic and uses runtime ABI **3**. The
+user approved the concrete contract, including runtime ABI 3, on 2026-09-03.
+The separately authorized 29.2 compiler/runtime implementation completed on
+2026-09-03.
+
+Runtime ABI is private compiler artifact metadata and is absent from public
+capabilities and receipts. Shuttle keeps artifacts opaque and delegates
+runtime-ABI validation to `clothc` during inspect, reuse, and link. Its remaining
+role is to prove whole/separate/source-free reuse, failure preservation, and
+determinism without inspecting expressions, MIR, guard codes, or object payloads.
+
+Artifact format 4, compiler ABI 4, protocol 2, receipt schema 1, and manifest
+schema 1 remain unchanged. Runtime-ABI-2 artifacts require rebuilding
+after the coordinated transition. No manifest, scheduler, or dependency behavior
+changes.
+
+Exit requires the compiler's approved semantics, exact ABI coordination, stale
+artifact rejection, affected-consumer invalidation, unrelated reuse, preserved
+outputs, source-free execution, relocated deterministic builds, and all Rust and
+shared tests against both compiler configurations.
 
 ## Stage 28: Scalar-constant artifact coordination
 

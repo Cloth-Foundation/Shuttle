@@ -54,6 +54,11 @@ Older packages must be rebuilt. Process protocol 2, receipt schema 1, and
 manifest schema 1 remain unchanged; the compiler owns
 [artifact schema v4](../../../docs/artifact_schema_v4.md).
 
+Stage 29.2 advances the compiler-owned runtime ABI to 3 for checked integer
+arithmetic. Runtime ABI is not a capability or receipt field: Shuttle continues
+to pass artifacts opaquely and `clothc` validates their private compatibility
+metadata during inspect, reuse, and link. No process or Shuttle schema changes.
+
 Stage 24 adds `reuse` to this capability set. Its current-input validation,
 cache-miss status, and persistent-state rules are owned by
 [`stage_24_reuse.md`](stage_24_reuse.md).
