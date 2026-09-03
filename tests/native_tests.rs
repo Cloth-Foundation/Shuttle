@@ -203,6 +203,209 @@ fn structs_link_and_execute_without_dependency_sources() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn constants_link_and_execute_without_dependency_sources() {
+    let fixture = Fixture::constants();
+    let separate = run(&mut fixture.shuttle("run", &compiler()));
+    let expected = b"42\n-128\n-9223372036854775808\n18446744073709551615\ntrue\ntrue\ntrue\nQ\ntrue\ntrue\ntrue\nminimum\nmaximum\nready\n";
+    expect_status(&separate, 0);
+    assert_eq!(separate.stdout, expected);
+    assert!(separate.stderr.is_empty());
+    let whole = whole_project_run(&fixture);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, expected);
+    let executed = source_free_run(&fixture);
+    expect_status(&executed, 0);
+    assert_eq!(executed.stdout, expected);
+    assert!(executed.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn computed_constants_preserve_relocated_parallel_native_artifacts() {
+    let serial = Fixture::constants();
+    let parallel = Fixture::constants();
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    expect_status(&first, 0);
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, second.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+    let executable = format!("app/target/x86_64/app{}", std::env::consts::EXE_SUFFIX);
+    assert_eq!(
+        fs::read(serial.root.join(&executable)).unwrap(),
+        fs::read(parallel.root.join(&executable)).unwrap()
+    );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn computed_constant_edits_invalidate_consumers_even_when_value_is_unchanged() {
+    let selected = compiler();
+    for (path, before, after, expected, upstream) in [
+        (
+            "models/src/Constants.co",
+            "hidden * 2",
+            "hidden + hidden",
+            &b"43\nmatch\n"[..],
+            false,
+        ),
+        (
+            "models/src/Constants.co",
+            "hidden = Input.Base",
+            "hidden = Input.Base + 1",
+            &b"45\nother\n"[..],
+            false,
+        ),
+        (
+            "core/src/Seed.co",
+            "3 * 7",
+            "3 * 8",
+            &b"49\nother\n"[..],
+            true,
+        ),
+    ] {
+        let fixture = Fixture::constants();
+        fixture.write(
+            "app/src/Main.co",
+            r#"
+import models::Constants as Values;
+static final int64 Next = Values.Answer + 1;
+static func Main() {
+  println(Next);
+  switch (int64(42)) {
+    case Values.Answer: { println("match"); }
+    default: { println("other"); }
+  }
+}
+"#,
+        );
+        let first = run(&mut fixture.shuttle("run", &selected));
+        expect_status(&first, 0);
+        assert_eq!(first.stdout, b"43\nmatch\n");
+        let directory = "app/target/x86_64/packages";
+        let previous = fixture.artifact_bytes(directory);
+        let mut stale = artifact_records(&fixture)
+            .into_iter()
+            .find(|record| record.name == "app")
+            .unwrap();
+        let snapshot = fixture.root.join("previous-app.cpa");
+        fs::copy(&stale.path, &snapshot).unwrap();
+        stale.path = snapshot;
+        let source = fs::read_to_string(fixture.root.join(path)).unwrap();
+        let changed = source.replace(before, after);
+        assert_ne!(source, changed);
+        fixture.write(path, &changed);
+        let rebuilt = run(&mut fixture.visible_shuttle("run", &selected));
+        expect_status(&rebuilt, 0);
+        assert_eq!(rebuilt.stdout, expected);
+        let progress = String::from_utf8_lossy(&rebuilt.stderr);
+        let current = fixture.artifact_bytes(directory);
+        for package in ["foundation", "tools", "data-models", "app"] {
+            let changed = upstream || matches!(package, "data-models" | "app");
+            let action = if changed { "compiling" } else { "reusing" };
+            assert!(
+                progress.contains(&format!("shuttle: {action} {package} ")),
+                "{progress}"
+            );
+            assert_eq!(previous[package] != current[package], changed, "{package}");
+        }
+        let warm = run(&mut fixture.visible_shuttle("run", &selected));
+        expect_status(&warm, 0);
+        assert_eq!(warm.stdout, expected);
+        assert_eq!(
+            String::from_utf8_lossy(&warm.stderr)
+                .matches("shuttle: reusing ")
+                .count(),
+            4
+        );
+        assert_eq!(current, fixture.artifact_bytes(directory));
+        expect_stale_link_rejected(&fixture, stale);
+        let whole = whole_project_run(&fixture);
+        expect_status(&whole, 0);
+        assert_eq!(whole.stdout, expected);
+        let source_free = source_free_run(&fixture);
+        expect_status(&source_free, 0);
+        assert_eq!(source_free.stdout, expected);
+        assert!(source_free.stderr.is_empty());
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn computed_constant_failures_never_replace_outputs_or_run_stale_programs() {
+    let selected = compiler();
+    for (before, after, diagnostic, producer_valid) in [
+        ("hidden = Input.Base", "hidden = 1 / 0", "by zero", false),
+        (
+            "hidden = Input.Base",
+            "hidden = hidden",
+            "cyclic static constant",
+            false,
+        ),
+        (
+            "Minimum = int8(-128)",
+            "Minimum = int8(-(-(-128)))",
+            "overflow",
+            false,
+        ),
+        (
+            "hidden = Input.Base",
+            "hidden = Input.Base + 1",
+            "duplicate switch case",
+            true,
+        ),
+        (
+            "initial = State.Ready",
+            "initial = State.Done",
+            "duplicate switch case",
+            true,
+        ),
+    ] {
+        let fixture = Fixture::constants();
+        let main = fs::read_to_string(fixture.root.join("app/src/Main.co")).unwrap();
+        fixture.write("app/src/Main.co", &(main + "\nstatic func Check(int64 n) { switch(n) { case Values.Answer: {} case 44: {} default: {} } }\n"));
+        expect_status(&run(&mut fixture.shuttle("build", &selected)), 0);
+        let directory = "app/target/x86_64/packages";
+        let previous = fixture.artifact_bytes(directory);
+        let executable = fixture.root.join(format!(
+            "app/target/x86_64/app{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+        let completed = fs::read(&executable).unwrap();
+        let path = "models/src/Constants.co";
+        let source = fs::read_to_string(fixture.root.join(path)).unwrap();
+        let changed = source.replace(before, after);
+        assert_ne!(source, changed);
+        fixture.write(path, &changed);
+        let failed = run(&mut fixture.shuttle("run", &selected));
+        expect_status(&failed, 1);
+        assert!(
+            failed.stdout.is_empty(),
+            "failed rebuild ran a stale program"
+        );
+        let detail = String::from_utf8_lossy(&failed.stderr);
+        assert!(detail.contains(diagnostic), "{detail}");
+        assert_eq!(completed, fs::read(&executable).unwrap());
+        let current = fixture.artifact_bytes(directory);
+        for package in ["app", "foundation", "tools"] {
+            assert_eq!(previous[package], current[package]);
+        }
+        assert_eq!(
+            previous["data-models"] != current["data-models"],
+            producer_valid
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
 fn switches_link_and_execute_without_dependency_sources() {
     let fixture = Fixture::switches();
     let separate = run(&mut fixture.shuttle("run", &compiler()));

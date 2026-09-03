@@ -1,5 +1,60 @@
 # Shuttle verification
 
+## Stage 28.4 scalar constant exit audit
+
+Verified on Windows on 2026-09-02 with development and ASan/UBSan compilers:
+all **27 public compiler-protocol and 20 native tests** pass with each compiler,
+inside its **148/148 CTest** run. All **43 ordinary Rust tests**, Rust 1.85
+checking, formatting, and Clippy with warnings denied pass.
+
+Computed-constant fixtures verify source-free privacy, typed narrowing, integer
+and enum labels, and failed-output preservation. Private-value and transitive
+dependency edits rebuild affected packages; unchanged evaluated values do not
+erase changed source/artifact identity. Unrelated packages preserve their bytes,
+and subsequent warm builds reuse all four packages.
+
+Old consumers fail to link against changed dependencies without replacing the
+completed executable. Invalid arithmetic, cycles, and duplicate-producing edits
+preserve completed consumer outputs; failed `run` never executes stale code.
+Whole-project, separate, and source-free execution agree after valid edits.
+
+Relocated serial/parallel builds with reversed dependency declarations produce
+identical interface artifacts on x86-64 and wasm32, and identical native objects,
+package artifacts, and executables on x86-64 across a PE timestamp boundary.
+Cycle and independent arithmetic diagnostics retain source locations and order
+after normalizing only the fixture-root path. Existing enum/struct/switch and
+integrity regressions remain part of the full runs.
+
+**Stage 28 coordination is complete.** Artifact format 4, compiler ABI 4,
+runtime ABI 2, process protocol 2, receipt schema 1, and manifest schema 1 are
+unchanged from 28.3. Tests use the existing fixtures and public compiler protocol;
+Shuttle does not interpret or evaluate constant metadata. No scheduling feature,
+dependency source, or later stage is introduced.
+
+## Compiler 28.3 constant integration checkpoint
+
+Verified on Windows on 2026-09-02 with development and ASan/UBSan compilers:
+all **25 public compiler-protocol and 17 native tests** pass with each compiler,
+within the compiler's **148/148 CTest** runs. All **43 ordinary Rust tests**,
+Rust 1.85 checking, formatting, and Clippy with warnings denied pass.
+
+Shuttle now requires artifact format **4** in capabilities and receipts.
+Process stubs reject old format-3 claims. Compiler ABI 4, runtime ABI 2,
+process protocol 2, receipt schema 1, and manifest schema 1 are unchanged.
+Shuttle still treats package artifacts as opaque and retains exact compiler,
+target, and dependency-digest checks.
+
+New native coverage compares whole-project, separate-package, and source-free
+execution for computed and negative constants, unsigned endpoints, bool/char and
+float values, private-to-public dependencies, cross-package chains, aliases,
+and integer/enum switch labels. Public CLI tests emit new forms on both targets;
+invalid constants preserve completed LLVM/native/interface outputs. The former
+check-only test now verifies supported emission and failure preservation.
+
+**Compiler 28.3 coordination is complete.** The broader constant-specific
+dependency-evolution, stale-link, relocated serial/parallel, and exit audit
+remain **28.4** work. This checkpoint does not close Stage 28.
+
 ## Stage 27.4 switch exit audit
 
 Verified 2026-09-02 with development and ASan/UBSan compilers: all **24 shared
@@ -281,3 +336,21 @@ serial/parallel bytes, and reuse/invalidation remain covered by existing suites.
 The compiler/editor audit is complete. Artifacts remain opaque to Shuttle;
 format 3, compiler ABI 4, runtime ABI 2, process protocol 2, receipt schema 1,
 and manifest schema 1 are unchanged. No new Shuttle feature is scheduled.
+
+## Compiler 28.2 constant checkpoint
+
+Verified on 2026-09-02 with development and sanitizer compilers: all 25 shared
+protocol and 16 native tests pass, as do all 43 ordinary Rust tests, Rust 1.85
+checking, formatting, and Clippy with warnings denied.
+
+The added public-process test accepts arithmetic, forward references, signed
+literal conversions, and skipped division-by-zero expressions through direct
+`clothc --check`. It verifies explicit LLVM/native/interface emission refusal
+and byte-for-byte preservation of completed outputs. An evaluated zero divisor
+still fails checking with source-error status one. Existing native and package
+behavior remains covered without adding launch scripts.
+
+Shuttle production code and format requirements are unchanged. New constant
+forms are not yet usable by `shuttle check`, because it produces package
+interfaces. Format-4 integration and new-form source-free/native execution
+remain scheduled for compiler 28.3; this is not the Stage 28 exit audit.
