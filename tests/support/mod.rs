@@ -14,6 +14,36 @@ pub struct Fixture {
 }
 
 pub const STRUCT_OUTPUT: &[u8] = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n100\n101\n104\ninitial\n";
+pub const SWITCH_OUTPUT: &[u8] =
+    b"ready\nready\nactive\nfallback\ndone\nfallback\nsmall\nother\nmaximum\n";
+pub const SWITCH_CASES: &[&str] = &["Ready", "ready", "_Done"];
+
+pub const SWITCH_MAIN: &str = r#"
+import models::State as Status;
+import models::StateReader as Constants;
+static func Describe(Status state): string {
+  switch (state) {
+    case Status.Ready: { return "ready"; }
+    case Constants.Initial, Status._Done: { return Constants.Name(state); }
+  }
+}
+static func Fallback(Status state): string {
+  switch (state) { case Status.Ready: { return "ready"; } default: { return "fallback"; } }
+}
+static func Number(int64 value): string {
+  switch (value) { case Constants.Small: { return "small"; } default: { return "other"; } }
+}
+static func Main() {
+  for (var state in Constants.Values()) {
+    println(Describe(state));
+    println(Fallback(state));
+  }
+  println(Number(7));
+  println(Number(9));
+  uint64 maximum = 18446744073709551615;
+  switch (maximum) { case Constants.Maximum: { println("maximum"); } default: { println("wrong"); } }
+}
+"#;
 
 impl Fixture {
     pub fn new() -> Self {
@@ -30,6 +60,57 @@ impl Fixture {
         fixture.write("models/src/StateReader.co", "State Value;\nStateReader(State value) { Value = value; }\nfunc Read(): State { return Value; }\nstatic final State Initial = State.ready;\n");
         fixture.write("app/src/Main.co", "import models::State as JobState;\nimport models::StateReader;\nstatic func Main() {\n  JobState[] values = [JobState.Ready, StateReader.Initial, JobState._Done];\n  for (var value in values) { println(value); }\n  StateReader reader = StateReader(JobState._Done);\n  println(reader.Read() == JobState._Done);\n  println(reader.Read()::typeName);\n}\n");
         fixture
+    }
+
+    pub fn switches() -> Self {
+        let fixture = Self::new();
+        fixture.write_switch_model(SWITCH_CASES, "ready", 7);
+        fixture.write("models/src/Other.co", "enum { Ready, ready, _Done }\n");
+        fixture.write("app/src/Main.co", SWITCH_MAIN);
+        fixture
+    }
+
+    pub fn write_switch_model(&self, cases: &[&str], initial: &str, small: u8) {
+        self.write(
+            "models/src/State.co",
+            &format!("enum {{ {} }}\n", cases.join(", ")),
+        );
+        let values = cases
+            .iter()
+            .map(|name| format!("State.{name}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.write(
+            "models/src/StateReader.co",
+            &format!(
+                r#"
+static final State Initial = State.{initial};
+static final int8 Small = {small};
+static final int32 hidden = 1;
+static final uint64 Maximum = 18446744073709551615;
+static func Values(): State[] {{ return [{values}]; }}
+static func Name(State value): string {{
+  switch (value) {{
+    case State.Ready, State.ready: {{ return "active"; }}
+    default: {{ return "done"; }}
+  }}
+}}
+"#
+            ),
+        );
+    }
+
+    pub fn reverse_dependencies(&self) {
+        let path = self.root.join("app/Shuttle.toml");
+        let source = fs::read_to_string(path)
+            .expect("fixture manifest")
+            .replace("\r\n", "\n");
+        let reversed = source.replace(
+            "models = { path = \"../models\" }\ntools = { path = \"../tools\" }",
+            "tools = { path = \"../tools\" }\nmodels = { path = \"../models\" }",
+        );
+        assert_ne!(source, reversed, "fixture dependency order did not change");
+        self.write("app/Shuttle.toml", &reversed);
     }
 
     pub fn from_fixture(fixture: &str, name: &str) -> Self {

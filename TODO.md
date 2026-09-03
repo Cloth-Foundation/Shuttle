@@ -16,7 +16,35 @@ The [26.4 exit audit](docs/testing.md#stage-264-struct-exit-audit) passed with
 development and sanitizer compilers on 2026-09-02. Stage 26.5.1 coordinated
 explicit-override verification is also complete; see `docs/testing.md`.
 
+Stage 27 coordination is complete following approval and verification through
+27.4 on 2026-09-02. The [exit audit](docs/testing.md#stage-274-switch-exit-audit)
+closes keyword policy, source-free execution, dependency evolution, and
+determinism. No compiler protocol changes or later stages are introduced.
+
 ## Scheduled work
+
+### Stage 27: Switch keyword and dependency-evolution coordination
+
+- [x] Mirror the approved reserved
+  `switch`, `case`, and `default` words in dependency-alias validation; test
+  rejection by both tools without changing package-name grammar or schemas.
+  Completed with both compiler configurations and the Rust gates on 2026-09-02;
+  see `docs/testing.md`.
+- [x] Verify switch compilation and execution against source-free enum and
+  scalar-constant artifacts, including switches in dependency object payloads,
+  import aliases, grouped labels, defaults, and widened/full-width constants.
+  Whole/separate/source-free output agrees with both compiler configurations.
+- [x] Audit switch-specific dependency evolution in 27.4. Added cases must
+  invalidate and reject uncovered consumers;
+  explicit fallbacks must work, and failures must preserve completed output.
+  Cover reordered/removed cases and constant-value edits too.
+- [x] Prove whole/separate native behavior and deterministic serial/parallel
+  artifacts; pass Rust and shared development/sanitizer protocol/native gates.
+  Update maintainer testing records without duplicating the language reference.
+
+Completed 2026-09-02: 24 shared protocol and 16 native tests pass with both
+compiler configurations; each passes all 141 CTests. All 43 ordinary Rust tests,
+formatting, Clippy with warnings denied, and Rust 1.85 checking also pass.
 
 ### Stage 26: Aggregate artifact compatibility
 

@@ -15,7 +15,7 @@ use std::process::Command;
 use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
-use support::{Fixture, compiler, expect_status, run};
+use support::{Fixture, SWITCH_CASES, SWITCH_MAIN, compiler, expect_status, run};
 
 #[derive(Clone, Debug)]
 struct ProtocolArtifact {
@@ -43,6 +43,234 @@ fn arguments(fixture: &Fixture) -> Vec<OsString> {
         .expect("check request")
         .arguments()
         .to_vec()
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn switch_interface_artifacts_and_diagnostics_are_deterministic() {
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let serial = Fixture::switches();
+        let parallel = Fixture::switches();
+        parallel.reverse_dependencies();
+        for (fixture, jobs) in [(&serial, "1"), (&parallel, "4")] {
+            let checked = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&checked, 0);
+            assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+        }
+        let directory = format!("app/target/{target}/check/packages");
+        let previous = serial.artifact_bytes(&directory);
+        assert_eq!(previous, parallel.artifact_bytes(&directory));
+        let mut failures = Vec::new();
+        for (fixture, jobs) in [(&serial, "1"), (&parallel, "4")] {
+            fixture.write_switch_model(&["Ready", "ready", "_Done", "Added"], "ready", 7);
+            let failed = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&failed, 1);
+            assert!(failed.stdout.is_empty());
+            assert!(String::from_utf8_lossy(&failed.stderr).contains("missing cases: Added"));
+            let current = fixture.artifact_bytes(&directory);
+            for package in ["app", "foundation", "tools"] {
+                assert_eq!(
+                    current[package], previous[package],
+                    "failed check replaced {package}"
+                );
+            }
+            assert_ne!(current["data-models"], previous["data-models"]);
+            // Relocation changes only the absolute project prefix. Keep source
+            // locations, diagnostic text, notes, and ordering in the comparison.
+            failures.push(
+                String::from_utf8(failed.stderr)
+                    .expect("UTF-8 diagnostics")
+                    .replace(
+                        &fixture.root.to_string_lossy().replace('\\', "/"),
+                        "<project>",
+                    ),
+            );
+        }
+        assert_eq!(
+            failures[0], failures[1],
+            "switch diagnostics depend on scheduling/path"
+        );
+        assert_eq!(
+            serial.artifact_bytes(&directory),
+            parallel.artifact_bytes(&directory)
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn switch_source_free_evolution_and_access_checks_preserve_output() {
+    let fixture = Fixture::switches();
+    let mut artifacts = compile_switch_dependencies(&fixture);
+    let app = compile_interface(
+        &fixture,
+        ("app", "0.1.0", "app/src"),
+        Some("Main.co"),
+        &[("models", "data-models"), ("tools", "tools")],
+        &artifacts,
+    );
+    let mut previous = fs::read(&app.path).expect("completed switch artifact");
+    for package in ["core", "tools"] {
+        fs::rename(
+            fixture.root.join(package).join("src"),
+            fixture.root.join(package).join("hidden-source"),
+        )
+        .expect("hide test dependency sources");
+    }
+    for (cases, initial, small, expected) in [
+        (&["_Done", "ready", "Ready"][..], "ready", 7, None),
+        (SWITCH_CASES, "ready", 9, None),
+        (
+            &["Ready", "ready", "_Done", "Added"][..],
+            "ready",
+            7,
+            Some("missing cases: Added"),
+        ),
+        (
+            &["Ready", "ready"][..],
+            "ready",
+            7,
+            Some("has no case '_Done'"),
+        ),
+        (
+            &["Ready", "ready", "Finished"][..],
+            "ready",
+            7,
+            Some("has no case '_Done'"),
+        ),
+        (SWITCH_CASES, "Ready", 7, Some("duplicate switch case")),
+    ] {
+        fixture.write_switch_model(cases, initial, small);
+        artifacts[1] = compile_interface(
+            &fixture,
+            ("data-models", "1.2.3-beta.1+local", "models/src"),
+            None,
+            &[("foundation", "foundation")],
+            std::slice::from_ref(&artifacts[0]),
+        );
+        fs::rename(
+            fixture.root.join("models/src"),
+            fixture.root.join("models/hidden-source"),
+        )
+        .expect("hide edited model sources");
+        let (mut command, _) = interface_command(
+            &fixture,
+            ("app", "0.1.0", "app/src"),
+            Some("Main.co"),
+            &[("models", "data-models"), ("tools", "tools")],
+            &artifacts,
+        );
+        let output = run(&mut command);
+        expect_status(&output, i32::from(expected.is_some()));
+        let current = fs::read(&app.path).expect("consumer artifact");
+        if let Some(expected) = expected {
+            assert!(output.stdout.is_empty());
+            let diagnostic = String::from_utf8_lossy(&output.stderr);
+            assert!(diagnostic.contains(expected), "{diagnostic}");
+            assert_eq!(
+                current, previous,
+                "failed source-free compilation replaced output"
+            );
+        } else {
+            assert!(output.stderr.is_empty());
+            assert_ne!(
+                current, previous,
+                "consumer did not retain changed dependency identity"
+            );
+            previous = current;
+        }
+        fs::rename(
+            fixture.root.join("models/hidden-source"),
+            fixture.root.join("models/src"),
+        )
+        .expect("restore test model sources for next edit");
+    }
+    check_switch_access_policy(&fixture, &artifacts, &app, &previous);
+}
+
+fn compile_switch_dependencies(fixture: &Fixture) -> [ProtocolArtifact; 3] {
+    let foundation =
+        compile_interface(fixture, ("foundation", "1.0.0", "core/src"), None, &[], &[]);
+    let models = compile_interface(
+        fixture,
+        ("data-models", "1.2.3-beta.1+local", "models/src"),
+        None,
+        &[("foundation", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    let tools = compile_interface(
+        fixture,
+        ("tools", "0.2.0", "tools/src"),
+        None,
+        &[("base", "foundation")],
+        std::slice::from_ref(&foundation),
+    );
+    [foundation, models, tools]
+}
+
+fn check_switch_access_policy(
+    fixture: &Fixture,
+    artifacts: &[ProtocolArtifact],
+    app: &ProtocolArtifact,
+    previous: &[u8],
+) {
+    for body in [
+        "int32 n = 1; switch (n) { case Constants.hidden: {} }",
+        "switch (Status.Ready) { case Foreign.Ready: {} default: {} }",
+    ] {
+        fixture.write("app/src/Main.co", &format!(
+            "import models::State as Status; import models::StateReader as Constants; import models::Other as Foreign; static func Main() {{ {body} }}"));
+        let (mut command, _) = interface_command(
+            fixture,
+            ("app", "0.1.0", "app/src"),
+            Some("Main.co"),
+            &[("models", "data-models"), ("tools", "tools")],
+            artifacts,
+        );
+        // No dependency source root is present in this request; hide them too.
+        fs::rename(
+            fixture.root.join("models/src"),
+            fixture.root.join("models/hidden-source"),
+        )
+        .expect("hide model sources for access check");
+        let rejected = run(&mut command);
+        expect_status(&rejected, 1);
+        let diagnostic = String::from_utf8_lossy(&rejected.stderr);
+        assert!(
+            diagnostic.contains(if body.contains("hidden") {
+                "private"
+            } else {
+                "cannot be used"
+            }),
+            "{diagnostic}"
+        );
+        assert!(rejected.stdout.is_empty());
+        assert_eq!(fs::read(&app.path).expect("preserved artifact"), previous);
+        fs::rename(
+            fixture.root.join("models/hidden-source"),
+            fixture.root.join("models/src"),
+        )
+        .expect("restore model sources");
+    }
+    fixture.write("app/src/Main.co", SWITCH_MAIN);
+    for keyword in ["switch", "case", "default"] {
+        let (mut command, _) = interface_command(
+            fixture,
+            ("app", "0.1.0", "app/src"),
+            Some("Main.co"),
+            &[(keyword, "data-models"), ("tools", "tools")],
+            artifacts,
+        );
+        let rejected = run(&mut command);
+        expect_status(&rejected, 2);
+        assert!(rejected.stdout.is_empty());
+        assert_eq!(fs::read(&app.path).expect("preserved artifact"), previous);
+    }
 }
 
 #[test]
@@ -810,6 +1038,17 @@ fn rejects_invalid_native_text_encoding_without_crashing() {
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST"]
 fn rejects_invalid_source_layouts_and_alias_collisions() {
+    for keyword in ["switch", "case", "default"] {
+        let fixture = Fixture::new();
+        let manifest = fs::read_to_string(fixture.manifest()).expect("fixture manifest");
+        fixture.write(
+            "app/Shuttle.toml",
+            &manifest.replace("models =", &format!("{keyword} =")),
+        );
+        let output = run(&mut fixture.shuttle("check", &compiler()));
+        expect_status(&output, 1);
+        assert!(String::from_utf8_lossy(&output.stderr).contains("is a Cloth keyword"));
+    }
     for (path, source, message) in [
         (
             "app/src/models/Local.co",
@@ -950,6 +1189,15 @@ fn output_failures_preserve_directories_and_unrelated_temporary_neighbors() {
                 .starts_with(".cloth-output.")),
         "temporary LLVM output directories remain"
     );
+    let previous = fs::read(&output).expect("completed output");
+    fixture.write(
+        "app/src/Main.co",
+        "static func Main() { switch (0) { case 0, 0: {} } }\n",
+    );
+    let failure = invoke(&fixture, &args);
+    expect_status(&failure, 1);
+    assert!(String::from_utf8_lossy(&failure.stderr).contains("duplicate switch case"));
+    assert_eq!(fs::read(&output).expect("preserved output"), previous);
 }
 
 #[cfg(unix)]

@@ -765,10 +765,12 @@ fn is_cloth_keyword(value: &str) -> bool {
         "bool",
         "break",
         "byte",
+        "case",
         "char",
         "class",
         "const",
         "continue",
+        "default",
         "else",
         "enum",
         "extern",
@@ -783,10 +785,10 @@ fn is_cloth_keyword(value: &str) -> bool {
         "import",
         "in",
         "int",
-        "int8",
         "int16",
         "int32",
         "int64",
+        "int8",
         "interface",
         "is",
         "let",
@@ -799,13 +801,14 @@ fn is_cloth_keyword(value: &str) -> bool {
         "static",
         "struct",
         "super",
+        "switch",
         "trait",
         "true",
         "uint",
-        "uint8",
         "uint16",
         "uint32",
         "uint64",
+        "uint8",
         "unsafe",
         "var",
         "void",
@@ -842,6 +845,15 @@ mod tests {
         assert!(!is_dependency_alias("Models"));
         assert!(!is_dependency_alias("text-utils"));
         assert!(is_cloth_keyword("for"));
+        for keyword in [
+            "switch", "case", "default", "int8", "int16", "int32", "int64", "uint8", "uint16",
+            "uint32", "uint64",
+        ] {
+            assert!(is_cloth_keyword(keyword), "{keyword}");
+        }
+        for identifier in ["switches", "cases", "default_value"] {
+            assert!(!is_cloth_keyword(identifier), "{identifier}");
+        }
         assert!(!is_cloth_keyword("models"));
     }
 }

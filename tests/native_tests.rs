@@ -14,7 +14,9 @@ use std::process::{Command, Output};
 use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
-use support::{Fixture, STRUCT_OUTPUT, compiler, expect_status, run};
+use support::{
+    Fixture, STRUCT_OUTPUT, SWITCH_CASES, SWITCH_MAIN, SWITCH_OUTPUT, compiler, expect_status, run,
+};
 
 #[derive(Clone, Debug)]
 struct ArtifactRecord {
@@ -193,7 +195,256 @@ fn structs_link_and_execute_without_dependency_sources() {
     expect_status(&whole, 0);
     assert_eq!(whole.stdout, separate.stdout);
 
-    let mut artifacts = artifact_records(&fixture);
+    let executed = source_free_run(&fixture);
+    expect_status(&executed, 0);
+    assert_eq!(executed.stdout, expected);
+    assert!(executed.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn switches_link_and_execute_without_dependency_sources() {
+    let fixture = Fixture::switches();
+    let separate = run(&mut fixture.shuttle("run", &compiler()));
+    let expected = SWITCH_OUTPUT;
+    expect_status(&separate, 0);
+    assert_eq!(separate.stdout, expected);
+    assert!(separate.stderr.is_empty());
+    let whole = whole_project_run(&fixture);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, expected);
+    let executed = source_free_run(&fixture);
+    expect_status(&executed, 0);
+    assert_eq!(executed.stdout, expected);
+    assert!(executed.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn switch_native_artifacts_are_relocated_and_order_independent() {
+    let serial = Fixture::switches();
+    let parallel = Fixture::switches();
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    expect_status(&first, 0);
+    assert_eq!(first.stdout, SWITCH_OUTPUT);
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, second.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+    let executable = format!("app/target/x86_64/app{}", std::env::consts::EXE_SUFFIX);
+    assert_eq!(
+        fs::read(serial.root.join(&executable)).unwrap(),
+        fs::read(parallel.root.join(&executable)).unwrap()
+    );
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, SWITCH_OUTPUT);
+    assert!(whole.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn switch_edits_invalidate_native_consumers_and_reject_stale_links() {
+    let selected = compiler();
+    let constant_main = SWITCH_MAIN
+        .replace(
+            "case Constants.Initial, Status._Done:",
+            "case Status.ready, Status._Done:",
+        )
+        .replace(
+            "switch (state) { case Status.Ready:",
+            "switch (state) { case Constants.Initial:",
+        );
+    for (cases, initial, small, source, baseline, expected) in [
+        (
+            &["_Done", "ready", "Ready"][..],
+            "ready",
+            7,
+            SWITCH_MAIN,
+            SWITCH_OUTPUT,
+            &b"done\nfallback\nactive\nfallback\nready\nready\nsmall\nother\nmaximum\n"[..],
+        ),
+        (
+            SWITCH_CASES,
+            "ready",
+            9,
+            SWITCH_MAIN,
+            SWITCH_OUTPUT,
+            &b"ready\nready\nactive\nfallback\ndone\nfallback\nother\nsmall\nmaximum\n"[..],
+        ),
+        (
+            SWITCH_CASES,
+            "Ready",
+            7,
+            constant_main.as_str(),
+            &b"ready\nfallback\nactive\nready\ndone\nfallback\nsmall\nother\nmaximum\n"[..],
+            SWITCH_OUTPUT,
+        ),
+    ] {
+        let fixture = Fixture::switches();
+        fixture.write("app/src/Main.co", source);
+        let first = run(&mut fixture.shuttle("run", &selected));
+        expect_status(&first, 0);
+        assert_eq!(first.stdout, baseline);
+        let directory = "app/target/x86_64/packages";
+        let previous = fixture.artifact_bytes(directory);
+        let old_records = artifact_records(&fixture);
+        let mut stale_app = old_records
+            .iter()
+            .find(|artifact| artifact.name == "app")
+            .unwrap()
+            .clone();
+        let snapshot = fixture.root.join("previous-app.cpa");
+        fs::copy(&stale_app.path, &snapshot).expect("snapshot old consumer");
+        stale_app.path = snapshot;
+
+        fixture.write_switch_model(cases, initial, small);
+        let changed = run(&mut fixture.visible_shuttle("run", &selected));
+        expect_status(&changed, 0);
+        assert_eq!(
+            changed.stdout, expected,
+            "edited labels/tags changed meaning"
+        );
+        let current = fixture.artifact_bytes(directory);
+        let progress = String::from_utf8_lossy(&changed.stderr);
+        for package in ["data-models", "app"] {
+            assert!(
+                progress.contains(&format!("shuttle: compiling {package} ")),
+                "{progress}"
+            );
+            assert_ne!(current[package], previous[package], "stale {package}");
+        }
+        for package in ["foundation", "tools"] {
+            assert!(
+                progress.contains(&format!("shuttle: reusing {package} ")),
+                "{progress}"
+            );
+            assert_eq!(
+                current[package], previous[package],
+                "unrelated {package} changed"
+            );
+        }
+        let unchanged = run(&mut fixture.visible_shuttle("run", &selected));
+        expect_status(&unchanged, 0);
+        assert_eq!(unchanged.stdout, expected);
+        let progress = String::from_utf8_lossy(&unchanged.stderr);
+        assert_eq!(
+            progress.matches("shuttle: reusing ").count(),
+            4,
+            "{progress}"
+        );
+        assert!(!progress.contains("shuttle: compiling "));
+        assert_eq!(current, fixture.artifact_bytes(directory));
+
+        expect_stale_link_rejected(&fixture, stale_app);
+        let whole = whole_project_run(&fixture);
+        expect_status(&whole, 0);
+        assert_eq!(whole.stdout, expected);
+        let source_free = source_free_run(&fixture);
+        expect_status(&source_free, 0);
+        assert_eq!(source_free.stdout, expected);
+        assert!(source_free.stderr.is_empty());
+    }
+}
+
+fn expect_stale_link_rejected(fixture: &Fixture, stale_app: ArtifactRecord) {
+    let mut mixed = artifact_records(fixture);
+    let app_index = mixed
+        .iter()
+        .position(|artifact| artifact.name == "app")
+        .unwrap();
+    mixed[app_index] = stale_app;
+    let executable = fixture.root.join(format!(
+        "app/target/x86_64/app{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let completed = fs::read(&executable).expect("completed executable");
+    let rejected = invoke_link(fixture, &executable, &mixed);
+    expect_status(&rejected, 2);
+    assert!(rejected.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("dependency"));
+    assert_eq!(
+        fs::read(&executable).expect("preserved executable"),
+        completed
+    );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn switch_coverage_failures_preserve_outputs_and_default_accepts_added_cases() {
+    let fixture = Fixture::switches();
+    let selected = compiler();
+    let first = run(&mut fixture.shuttle("run", &selected));
+    expect_status(&first, 0);
+    assert_eq!(first.stdout, SWITCH_OUTPUT);
+    let directory = "app/target/x86_64/packages";
+    let previous = fixture.artifact_bytes(directory);
+    let executable = fixture.root.join(format!(
+        "app/target/x86_64/app{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let completed = fs::read(&executable).expect("completed executable");
+    for (cases, initial, expected) in [
+        (&["Ready", "ready"][..], "ready", "has no case '_Done'"),
+        (
+            &["Ready", "ready", "Finished"][..],
+            "ready",
+            "has no case '_Done'",
+        ),
+        (SWITCH_CASES, "Ready", "duplicate switch case"),
+        (
+            &["Ready", "ready", "_Done", "Added"][..],
+            "ready",
+            "missing cases: Added",
+        ),
+    ] {
+        fixture.write_switch_model(cases, initial, 7);
+        let failed = run(&mut fixture.visible_shuttle("run", &selected));
+        expect_status(&failed, 1);
+        assert!(
+            failed.stdout.is_empty(),
+            "failed rebuild ran a stale executable"
+        );
+        assert!(String::from_utf8_lossy(&failed.stderr).contains(expected));
+        assert_eq!(
+            fs::read(&executable).expect("preserved executable"),
+            completed
+        );
+        let current = fixture.artifact_bytes(directory);
+        for package in ["app", "foundation", "tools"] {
+            assert_eq!(current[package], previous[package]);
+        }
+        assert_ne!(current["data-models"], previous["data-models"]);
+    }
+    let fallback = SWITCH_MAIN.replace(
+        "case Constants.Initial, Status._Done: { return Constants.Name(state); }",
+        "case Constants.Initial, Status._Done: { return Constants.Name(state); }\n    default: { return \"new\"; }",
+    );
+    assert_ne!(fallback, SWITCH_MAIN);
+    fixture.write("app/src/Main.co", &fallback);
+    let expected =
+        b"ready\nready\nactive\nfallback\ndone\nfallback\nnew\nfallback\nsmall\nother\nmaximum\n";
+    let repaired = run(&mut fixture.shuttle("run", &selected));
+    expect_status(&repaired, 0);
+    assert_eq!(repaired.stdout, expected);
+    let whole = whole_project_run(&fixture);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, expected);
+    let source_free = source_free_run(&fixture);
+    expect_status(&source_free, 0);
+    assert_eq!(source_free.stdout, expected);
+}
+
+fn source_free_run(fixture: &Fixture) -> Output {
+    let selected = compiler();
+    let mut artifacts = artifact_records(fixture);
     // Hide only test-owned sources. The next compile and link must use package
     // declarations, aggregate layouts, physical signatures, and object payloads.
     for package in ["core", "models", "tools"] {
@@ -255,12 +506,9 @@ fn structs_link_and_execute_without_dependency_sources() {
     let executable = fixture
         .root
         .join(format!("source-free-app{}", std::env::consts::EXE_SUFFIX));
-    let linked = invoke_link(&fixture, &executable, &artifacts);
+    let linked = invoke_link(fixture, &executable, &artifacts);
     expect_status(&linked, 0);
-    let executed = run(&mut Command::new(executable));
-    expect_status(&executed, 0);
-    assert_eq!(executed.stdout, expected);
-    assert!(executed.stderr.is_empty());
+    run(&mut Command::new(executable))
 }
 
 fn artifact_records(fixture: &Fixture) -> Vec<ArtifactRecord> {

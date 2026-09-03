@@ -1,5 +1,75 @@
 # Shuttle verification
 
+## Stage 27.4 switch exit audit
+
+Verified 2026-09-02 with development and ASan/UBSan compilers: all **24 shared
+protocol and 16 native tests** pass; each compiler passes all 141 CTests. All
+43 ordinary Rust tests, formatting, Clippy with warnings denied, and Rust 1.85
+checking pass.
+
+The shared switch fixture exercises enum declarations and retained integer/enum
+constants across whole-project, separate, and source-free compilation:
+
+- reordered cases and changed constants rebuild affected packages, preserve
+  unrelated artifacts, and reuse all four packages on the next unchanged run;
+- added, removed, renamed, and duplicate-producing case edits reject invalid
+  consumers without replacing their completed artifacts or executable, and
+  failed `run` never executes the stale program;
+- an explicit default accepts a new case, with matching output in all three
+  compilation modes; private constants and unrelated enum labels stay invalid
+  without dependency sources;
+- old consumer artifacts cannot link against edited dependencies, and rejected
+  link requests preserve the completed executable;
+- relocated serial/parallel builds with reversed dependency declaration order
+  produce identical interface artifacts on x86-64/wasm32 and identical native
+  artifacts/executables on x86-64 across a PE timestamp boundary; and
+- added-case diagnostics agree after normalizing only the absolute fixture-root
+  prefix, while explicit protocol-v2 keyword aliases fail without replacing
+  completed output.
+
+**Stage 27 coordination is complete.** Tests extend existing fixture helpers and
+suites; Shuttle still treats artifacts as opaque compiler-owned data. Artifact
+format 3, compiler ABI 4, runtime ABI 2, protocol 2, receipt schema 1, and manifest
+schema 1 are unchanged. No scheduling or dependency-resolution feature is added.
+
+## Stage 27.3 source-free switch lowering
+
+Verified 2026-09-02 with development and ASan/UBSan compilers: all 139 CTests
+pass, including 22 shared protocol and 13 native tests. All 43 ordinary Rust
+tests, formatting, Clippy with warnings denied, and Rust 1.85 checking pass.
+
+The switch native test compares whole-project and separate execution, hides
+dependency sources, and compiles/links the consumer from verified artifacts.
+It covers dependency-owned switch bodies, nominal enum aliases and constants,
+grouped labels, defaults, widening of imported integer constants, and full-width
+unsigned labels. Failed-emission checks now use a duplicate-label source error
+and retain the completed LLVM output. Switch works in artifact-based checking
+and builds; Shuttle still does not parse language bodies or interpret enum tags.
+
+Artifact format 3, compiler ABI 4, runtime ABI 2, process protocol 2, receipt
+schema 1, and manifest schema 1 are unchanged. At this checkpoint, evolution,
+invalidation, and serial/parallel verification remained scheduled for 27.4;
+the exit audit above closes that matrix.
+
+## Stage 27.2 switch keyword coordination
+
+Verified 2026-09-02 with development and sanitizer compilers: 22 shared protocol
+tests and 12 native tests pass, alongside 43 ordinary Rust tests, formatting,
+Clippy with warnings denied, and Rust 1.85 checking. Both compiler configurations
+pass all 127 CTest entries.
+
+Manifest validation rejects `switch`, `case`, and `default` as dependency aliases;
+compiler protocols independently use lexer classification. Integer keyword ordering
+in Shuttle's binary-search table is corrected and tested. Package-name grammar
+and persistent schemas are unchanged. The emission-failure test checks that a
+switch lowering diagnostic does not replace a completed LLVM output.
+
+At that checkpoint switch was supported only by direct compiler frontend
+checking. The 27.3 audit above supersedes the temporary native/artifact gate;
+the 27.4 audit above closes the broader dependency-evolution verification.
+
+## Quality gates
+
 Run the standalone quality gates from this checkout:
 
 ```sh
