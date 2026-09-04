@@ -1,5 +1,73 @@
 # Shuttle verification
 
+## Coordinated 30.4 integer conversion-mode exit audit
+
+Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.
+Each compiler passes all **29 public compiler-protocol/toolchain and 24 native
+Shuttle cases** inside the compiler's **200-test** matrix. All **43 ordinary
+Rust tests**, Rust **1.85.0**, formatting, warning-denied Clippy, editor checks,
+C++ formatting, and repository whitespace gates pass.
+
+Integer conversion fixtures run from distinct temporary project roots and
+produce byte-identical serial/parallel package artifacts for x86-64 and wasm32.
+Whole-project, separate-package, and source-free native results agree.
+Conversion edits rebuild affected packages while reusing unrelated packages;
+invalid follow-up input preserves completed artifacts and executables and never
+runs stale output.
+
+The compiler owns the exhaustive 81 canonical-pair constant oracle and 121
+accepted-spelling-pair runtime/LLVM matrix. Shuttle continues to treat scalar
+constants and object code as opaque artifacts. Artifact format **4**, compiler
+ABI **4**, runtime ABI **3**, process protocol **2**, receipt schema **1**, and
+manifest schema **1** remain unchanged. No Shuttle production behavior or
+test-only compiler switch was added.
+
+**Stage 30 coordination is complete.** Later work requires a separately
+approved stage.
+
+## Compiler 30.3 integer conversion lowering and integration checkpoint
+
+Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.
+Each compiler passes all **29 public compiler-protocol/toolchain and 24 native
+Shuttle cases** inside the compiler's **194-test** matrix. All **43 ordinary Rust
+tests**, Rust **1.85.0**, formatting, warning-denied Clippy, editor checks, C++
+formatting, and repository whitespace gates also pass.
+
+Shared real-compiler fixtures prove runtime and scalar-constant wrapping and
+saturating results through Shuttle's public process boundary. Whole, separate,
+and source-free package builds agree. Serial and parallel builds produce
+deterministic x86-64 and wasm32 artifacts, conversion edits invalidate only
+affected packages, unrelated packages are reused, and an invalid follow-up build
+preserves completed artifacts and executable output.
+
+Shuttle does not parse source expressions or conversion metadata. It remains an
+opaque artifact coordinator, and no production, capability, receipt, process,
+manifest, scheduler, or compatibility version changed at this checkpoint.
+
+**Compiler 30.3 coordination is complete.** At that checkpoint, Stage 30
+remained active with compiler 30.4 awaiting separate authorization.
+
+## Compiler 30.2 integer conversion frontend and constant checkpoint
+
+Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.
+Each compiler passes all **28 public compiler-protocol and 22 native Shuttle
+tests** inside its **188/188 CTest** run. All **43 ordinary Rust tests**, Rust
+1.85 checking, formatting, Clippy with warnings denied, and six compiler-backed
+editor tests per compiler pass. C++ formatting and both repository whitespace
+checks also pass.
+
+The compiler now validates runtime `Target::wrap(value)` and
+`Target::sat(value)` expressions through `--check` and evaluates required scalar
+constants. At this checkpoint, runtime MIR/LLVM and package behavior remained
+assigned to 30.3, and ordinary compilation stopped at an explicit compiler
+diagnostic. The 30.3 checkpoint above supersedes that temporary boundary.
+Shuttle continues to treat artifacts and constants as opaque. No production,
+capability, receipt, process, manifest, scheduler, or compatibility version
+changed at this checkpoint.
+
+At this checkpoint, Stage 30 coordination remained active with compiler 30.3
+awaiting separate authorization.
+
 ## Coordinated 29.4 checked runtime arithmetic exit audit
 
 Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.
