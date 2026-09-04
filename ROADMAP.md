@@ -35,6 +35,42 @@ Stage 31 coordination is complete following the compiler's separately
 authorized 31.4 exit audit on 2026-09-04. Coordinated package paths and every
 quality gate pass without a Shuttle production change.
 
+Stage 32 coordination is complete following the compiler's separately
+authorized 32.4 exit audit on 2026-09-04. Every coordinated package and quality
+gate passes without a Shuttle production change.
+
+## Stage 32: Typed numeric literal coordination
+
+Status: **complete — coordinated 32.4 exit audit passed 2026-09-04**
+
+The compiler owns the canonical `i8` through `i64`, `u8` through `u64`, `f32`,
+and `f64` source syntax and its exact typing. Shuttle continues to treat source,
+typed constants, interfaces, and object code as opaque compiler data. It does
+not parse suffixes or add literal policy to manifests, receipts, cache keys, or
+scheduling.
+
+Artifact format 4, compiler ABI 4, runtime ABI 3, protocol 2, receipt schema 1,
+and manifest schema 1 remain unchanged. The compiler digest provides normal
+cross-version invalidation.
+
+Coordinated implementation must verify whole/separate/source-free equivalence,
+affected-only invalidation, failed-output preservation, and relocated
+serial/parallel x86-64/wasm32 determinism with both compiler configurations.
+No Shuttle production change is expected. Later checkpoints require separate
+authorization.
+
+Compiler 32.3 adds no Shuttle production behavior. Public package fixtures
+prove suffixed constant and executable equivalence across whole-project,
+separate-package, and source-free compilation; affected-only invalidation;
+failed-output preservation; and relocated serial/parallel x86-64/wasm32
+determinism. Both compiler configurations pass the expanded 30 toolchain and
+26 native cases inside their 224-test matrices.
+
+The 32.4 exit audit also passes all 43 ordinary Rust tests, Rust 1.85 checking,
+formatting, warning-denied Clippy, both nine-test editor runs, documentation
+links, and repository hygiene gates. Stage 32 adds no Shuttle production or
+compatibility change. No later coordinated stage is active.
+
 ## Stage 31: MIR optimization coordination
 
 Status: **complete — coordinated 31.4 exit audit passed 2026-09-04**

@@ -31,9 +31,38 @@ on 2026-09-03. Stage 30 coordination is complete following the compiler's
 separately authorized 30.4 exit audit on 2026-09-03. No Shuttle production
 change was required. Stage 31 coordination is complete following the compiler's
 separately authorized 31.4 exit audit on 2026-09-04. No Shuttle production
-change was required.
+change was required. Stage 32 coordination is complete following the compiler's
+separately authorized 32.4 exit audit on 2026-09-04. No Shuttle production or
+compatibility change was required, and no later coordinated stage is active.
 
 ## Scheduled work
+
+### Stage 32: Typed numeric literal coordination
+
+- [x] Record the compiler-owned canonical suffix, exact typing, compatibility,
+  package, and non-goal boundaries. Approved 2026-09-04; Shuttle production
+  code remains unchanged.
+- [x] Record compiler 32.2 frontend completion. Both compiler configurations
+  pass the unchanged shared protocol and native Shuttle cases inside their
+  216-test matrices; no Shuttle production code or compatibility version
+  changed.
+- [x] With compiler 32.3, verify suffixed constants and executable behavior
+  across whole-project, separate-package, and source-free compilation without
+  parsing numeric syntax or compiler internals.
+- [x] Prove affected-only invalidation, failed-output preservation, and
+  relocated serial/parallel x86-64/wasm32 determinism with both compiler
+  configurations.
+- [x] Pass ordinary Rust, Rust 1.85, formatting, Clippy, shared
+  protocol/native, editor, documentation, and repository gates during the
+  coordinated 32.4 exit audit.
+
+  Completed 2026-09-04. Both compilers pass all 30 public toolchain and 26
+  native cases inside their 224-test matrices. All 43 ordinary Rust tests, the
+  Rust 1.85 minimum check, warning-denied Clippy, Rust/C++ formatting, both
+  nine-test editor runs, documentation links, and repository hygiene gates
+  pass. No production code or compatibility version changed.
+
+  **Stage 32 coordination is complete.** No later coordinated stage is active.
 
 ### Stage 31: MIR optimization coordination
 
