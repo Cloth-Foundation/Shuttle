@@ -1,5 +1,58 @@
 # Shuttle verification
 
+## Coordinated 32.4 typed numeric literal exit audit
+
+Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
+Each compiler passes all **30 public compiler-protocol/toolchain and 26 native
+Shuttle cases** inside its **224-test** matrix. All **43 ordinary Rust tests**,
+the Rust **1.85.0** minimum check, formatting, warning-denied Clippy, nine editor
+tests per compiler, documentation links, and repository hygiene gates pass.
+
+The unchanged public package fixtures prove whole-project, separate-package,
+and source-free typed-constant behavior; affected-only invalidation;
+failed-output preservation; and relocated serial/parallel x86-64/wasm32
+determinism. Shuttle remains unaware of numeric spelling and transports only
+opaque compiler artifacts. Artifact format **4**, compiler ABI **4**, runtime
+ABI **3**, process protocol **2**, receipt schema **1**, and manifest schema
+**1** remain unchanged. No Shuttle production code or configuration changed.
+
+**Stage 32 coordination is complete.** No later coordinated stage is active.
+
+## Compiler 32.3 typed numeric literal integration
+
+Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
+Each compiler passes all **30 public compiler-protocol/toolchain and 26 native
+Shuttle cases** inside the compiler's **224-test** matrix. All **43 ordinary
+Rust tests**, formatting, warning-denied Clippy, and nine editor tests per
+compiler pass.
+
+Public fixtures prove suffixed constants and executable behavior across
+whole-project, separate-package, and source-free compilation. They also prove
+affected-only invalidation, failed-output preservation, and relocated
+serial/parallel x86-64/wasm32 artifact determinism. Shuttle treats source
+spelling and canonical compiler values as opaque data; no production code,
+manifest option, cache field, or compatibility version changed. At this
+checkpoint compiler 32.4 remained separately authorized; its completed audit is
+recorded above.
+
+## Compiler 32.2 typed numeric literal frontend
+
+Recorded on 2026-09-04. Both development and sanitizer compiler matrices pass
+all **216 CTests**, including the unchanged **29 public compiler-protocol/
+toolchain and 24 native Shuttle cases** per compiler. Numeric suffix decoding,
+typing, recovery, and HIR canonicalization remain compiler-owned; Shuttle does
+not parse or persist source spelling. No Shuttle production code or
+compatibility version changed. Coordinated package work remains scheduled for
+compiler 32.3 and requires separate authorization.
+
+## Compiler 32.1 typed numeric literal contract
+
+Recorded on 2026-09-04. Typed numeric literal syntax and semantics remain
+compiler-owned. Artifact format 4, compiler ABI 4, runtime ABI 3, protocol 2,
+receipt schema 1, and manifest schema 1 remain unchanged. This checkpoint adds
+no Shuttle implementation or verification fixture; the later compiler 32.2
+frontend checkpoint is recorded above.
+
 ## Coordinated 31.4 MIR optimization exit audit
 
 Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
