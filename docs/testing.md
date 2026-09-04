@@ -1,5 +1,25 @@
 # Shuttle verification
 
+## Coordinated 31.4 MIR optimization exit audit
+
+Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
+Each compiler passes all **29 public compiler-protocol/toolchain and 24 native
+Shuttle cases** inside the compiler's **215-test** matrix. All **43 ordinary
+Rust tests**, Rust **1.85.0**, formatting, warning-denied Clippy, six editor
+checks per compiler, C++ formatting, documentation, and repository whitespace
+gates pass.
+
+The unchanged Shuttle package matrix proves whole-project, separate-package,
+and source-free behavior; affected-only invalidation; failed-output
+preservation; and relocated serial/parallel x86-64/wasm32 determinism with the
+always-on optimizer. Shuttle continues to treat MIR optimization and optimized
+artifacts as opaque compiler concerns. Artifact format **4**, compiler ABI
+**4**, runtime ABI **3**, process protocol **2**, receipt schema **1**, and
+manifest schema **1** remain unchanged. No Shuttle production behavior or
+configuration was added.
+
+**Stage 31 coordination is complete.** No later stage is active.
+
 ## Coordinated 30.4 integer conversion-mode exit audit
 
 Verified on Windows on 2026-09-03 with development and ASan/UBSan compilers.

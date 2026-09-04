@@ -29,9 +29,40 @@ complete following the separately authorized
 [29.4 exit audit](docs/testing.md#coordinated-294-checked-runtime-arithmetic-exit-audit)
 on 2026-09-03. Stage 30 coordination is complete following the compiler's
 separately authorized 30.4 exit audit on 2026-09-03. No Shuttle production
+change was required. Stage 31 coordination is complete following the compiler's
+separately authorized 31.4 exit audit on 2026-09-04. No Shuttle production
 change was required.
 
 ## Scheduled work
+
+### Stage 31: MIR optimization coordination
+
+- [x] Record the compiler-owned always-on MIR optimization contract and its
+  unchanged artifact, ABI, runtime, protocol, receipt, manifest, and scheduler
+  boundaries. Approved 2026-09-03; Shuttle production code is unchanged.
+- [x] Record compiler 31.2 canonical constants and scalar folding. Imported
+  scalar constants fold through source-free declarations in compiler tests;
+  Shuttle production code and every compatibility version remain unchanged.
+- [x] With compiler 31.3, verify optimized whole-project, separate-package, and
+  source-free behavior through the public process boundary without parsing MIR
+  or optimizer metadata. Both compiler configurations pass the shared
+  protocol and native package suites; no Shuttle implementation changed.
+- [x] Prove affected-only invalidation, unrelated reuse, failure preservation,
+  and relocated serial/parallel x86-64/wasm32 artifact determinism with both
+  compiler configurations. The existing deterministic package matrix remains
+  clean with the always-on optimizer and unchanged compatibility versions.
+- [x] Pass ordinary Rust, Rust 1.85, formatting, Clippy, shared
+  protocol/native, editor, and repository gates during the coordinated 31.4
+  exit audit.
+
+  Completed 2026-09-04. Both 215-test compiler configurations pass all 29
+  public protocol/toolchain and 24 native Shuttle cases. All 43 ordinary Rust
+  tests, Rust 1.85, warning-denied Clippy, formatting, six editor tests per
+  compiler, and repository gates pass. Existing package cases preserve
+  whole/separate/source-free equivalence, affected-only invalidation,
+  failed-output safety, and relocated serial/parallel x86-64/wasm32
+  determinism. Compatibility versions and Shuttle production code are
+  unchanged.
 
 ### Stage 30: Integer conversion-mode coordination
 
