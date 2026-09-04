@@ -31,6 +31,36 @@ Stage 30 coordination is complete following the compiler's separately
 authorized 30.4 exit audit on 2026-09-03. No Shuttle implementation or protocol
 change was required.
 
+Stage 31 coordination is complete following the compiler's separately
+authorized 31.4 exit audit on 2026-09-04. Coordinated package paths and every
+quality gate pass without a Shuttle production change.
+
+## Stage 31: MIR optimization coordination
+
+Status: **complete — coordinated 31.4 exit audit passed 2026-09-04**
+
+The compiler-owned contract inserts an always-on target-independent optimizer
+between verified MIR and ABI lowering. Shuttle continues to treat interfaces,
+scalar constants, and object code as opaque compiler output; it does not parse
+MIR, folded constants, pass names, or optimizer metadata.
+
+Artifact format 4, compiler ABI 4, runtime ABI 3, protocol 2, receipt schema 1,
+and manifest schema 1 remain unchanged. The compiler executable digest already
+invalidates artifacts produced by a different compiler binary. Stage 31 adds no
+optimization manifest option, cache-key field, capability, receipt field, or
+scheduler behavior.
+
+Coordinated exit requires whole/separate/source-free behavioral equivalence,
+affected-only invalidation, failed-output preservation, and relocated
+serial/parallel artifact determinism for x86-64 and wasm32 with both compiler
+configurations. Optimizer implementation, MIR verification, scalar semantics,
+and baseline/optimized compiler comparisons remain compiler responsibilities.
+
+The exit audit passes those package guarantees in both 215-test compiler
+configurations, plus all 43 ordinary Rust tests, Rust 1.85, formatting,
+warning-denied Clippy, editor checks, and repository gates. Compatibility
+versions remain unchanged, and no later stage is active.
+
 ## Stage 30: Integer conversion-mode coordination
 
 Status: **complete — compiler 30.4 exit audit passed on 2026-09-03**
