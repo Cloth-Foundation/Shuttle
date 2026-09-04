@@ -39,6 +39,48 @@ Stage 32 coordination is complete following the compiler's separately
 authorized 32.4 exit audit on 2026-09-04. Every coordinated package and quality
 gate passes without a Shuttle production change.
 
+Stage 33 coordination is complete following the compiler's separately
+authorized 33.4 exit audit on 2026-09-04. Shuttle remains opaque to source
+spelling and canonical compiler values.
+
+## Stage 33: Numeric literal notation coordination
+
+Status: **complete — coordinated compiler 33.4 exit audit passed 2026-09-04**
+
+The compiler owns scientific notation, binary/octal/hexadecimal integer
+prefixes, digit separators, exact decoding, and canonical HIR. Shuttle does not
+parse this syntax or add numeric policy to manifests, receipts, cache keys, or
+scheduling.
+
+Artifact format 4, compiler ABI 4, runtime ABI 3, protocol 2, receipt schema 1,
+and manifest schema 1 remain unchanged. The compiler executable digest provides
+normal cross-version invalidation. No Shuttle production change is planned.
+
+Compiler 33.2 adds the shared frontend decoder, exact value checks, canonical
+HIR, diagnostics, and two target-specific direct frontend checks. The unchanged
+30 protocol/toolchain and 26 native Shuttle cases pass inside both 226-test
+compiler matrices. This checkpoint changes no Shuttle implementation, fixture,
+or compatibility contract.
+
+Compiler 33.3 adds a compiler-owned numeric-notation fixture to Shuttle's
+existing public test launchers. It verifies identical whole-project, separate-
+package, and source-free behavior; x86-64/wasm32 relocated serial/parallel
+artifacts; affected-only invalidation; independent-package reuse; and failed-
+output preservation. Both compiler configurations pass 31 public toolchain and
+28 native Shuttle cases inside their 232-test matrices. Shuttle production code
+and compatibility contracts remain unchanged.
+
+Coordinated integration must verify whole/separate/source-free equivalence,
+affected-only invalidation, failed-output preservation, and relocated
+serial/parallel x86-64/wasm32 determinism with both compiler configurations.
+The coordinated 33.4 exit audit passes both 232-test compiler configurations,
+all 43 ordinary Rust tests, Rust 1.85 checking, warning-denied Clippy, formatting,
+editor checks, documentation targets, and repository gates. Existing package
+tests retain whole/separate/source-free equivalence, affected-only invalidation,
+failed-output preservation, and relocated serial/parallel x86-64/wasm32
+determinism. Shuttle production code and compatibility versions remain
+unchanged.
+
 ## Stage 32: Typed numeric literal coordination
 
 Status: **complete — coordinated 32.4 exit audit passed 2026-09-04**
@@ -69,7 +111,7 @@ determinism. Both compiler configurations pass the expanded 30 toolchain and
 The 32.4 exit audit also passes all 43 ordinary Rust tests, Rust 1.85 checking,
 formatting, warning-denied Clippy, both nine-test editor runs, documentation
 links, and repository hygiene gates. Stage 32 adds no Shuttle production or
-compatibility change. No later coordinated stage is active.
+compatibility change. Stage 33 coordination is tracked above.
 
 ## Stage 31: MIR optimization coordination
 

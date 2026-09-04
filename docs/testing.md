@@ -1,5 +1,70 @@
 # Shuttle verification
 
+## Coordinated compiler 33.4 numeric literal notation exit audit
+
+Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
+Each compiler passes all **31 public compiler-protocol/toolchain and 28 native
+Shuttle cases** inside its **232-test** matrix. All **43 ordinary Rust tests**,
+the Rust **1.85.0** minimum check, formatting, warning-denied Clippy, 10 editor
+tests per compiler, all 100 local Markdown target checks, and repository gates
+pass.
+
+The unchanged four-package matrix proves whole-project, separate-package, and
+source-free behavior; affected-only invalidation; failed-output preservation;
+and relocated serial/parallel x86-64/wasm32 determinism. Shuttle continues to
+transport opaque compiler artifacts without parsing numeric spelling or
+canonical values. Shuttle production code, schemas, cache keys, scheduling, and
+compatibility versions remain unchanged.
+
+**Stage 33 coordination is complete.**
+
+## Compiler 33.3 numeric literal notation integration
+
+Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
+Each compiler passes all **31 public compiler-protocol/toolchain and 28 native
+Shuttle cases** inside its **232-test** matrix. All **43 ordinary Rust tests**,
+Rust 1.85 checking, formatting, and warning-denied Clippy pass.
+
+The dedicated four-package fixture transports scientific, base-prefixed,
+separated, and suffixed values only through compiler-owned source and opaque
+artifacts. Whole-project, separate-package, and source-free output agrees.
+Relocated serial/parallel builds produce identical interface artifacts on both
+targets and identical native artifacts and executables on x86-64. A valid edit
+rebuilds only the affected package and consumer; an invalid base digit preserves
+completed package artifacts and the executable without running stale output.
+
+Shuttle production code, schemas, cache keys, and scheduling remain unchanged.
+Artifact format **4**, compiler ABI **4**, runtime ABI **3**, process protocol
+**2**, receipt schema **1**, and manifest schema **1** remain unchanged.
+Compiler 33.4 coordinated exit audit requires separate authorization.
+
+## Compiler 33.2 numeric literal notation frontend
+
+Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
+Each compiler passes all **30 public compiler-protocol/toolchain and 26 native
+Shuttle cases** inside its **226-test** matrix. The two new target-specific
+checks exercise the compiler frontend directly; no Shuttle fixture changes.
+
+Numeric spelling, exact evaluation, canonical HIR, and diagnostics remain
+compiler-owned. Shuttle continues to transport opaque compiler artifacts, and
+its production code, schemas, cache keys, and scheduling are unchanged.
+Artifact format **4**, compiler ABI **4**, runtime ABI **3**, process protocol
+**2**, receipt schema **1**, and manifest schema **1** remain unchanged.
+The separately authorized compiler 33.3 integration checkpoint is recorded
+above.
+
+## Compiler 33.1 numeric literal notation contract
+
+Recorded on 2026-09-04. Scientific notation, integer base prefixes, digit
+separators, exact decoding, diagnostics, and canonical HIR remain compiler-owned.
+Artifact format 4, compiler ABI 4, runtime ABI 3, protocol 2, receipt schema 1,
+and manifest schema 1 remain unchanged.
+
+This documentation-only checkpoint added no Shuttle implementation or fixture.
+The separately authorized compiler 33.2 frontend checkpoint is recorded above;
+coordinated package verification remains scheduled for later Stage 33
+checkpoints.
+
 ## Coordinated 32.4 typed numeric literal exit audit
 
 Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.
@@ -16,7 +81,8 @@ opaque compiler artifacts. Artifact format **4**, compiler ABI **4**, runtime
 ABI **3**, process protocol **2**, receipt schema **1**, and manifest schema
 **1** remain unchanged. No Shuttle production code or configuration changed.
 
-**Stage 32 coordination is complete.** No later coordinated stage is active.
+**Stage 32 coordination is complete.** The completed Stage 33 coordination audit
+is recorded above.
 
 ## Compiler 32.3 typed numeric literal integration
 

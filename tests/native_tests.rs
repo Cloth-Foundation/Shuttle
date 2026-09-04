@@ -15,8 +15,9 @@ use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
 use support::{
-    CHECKED_UPDATES_OUTPUT, Fixture, INTEGER_CONVERSIONS_OUTPUT, STRUCT_OUTPUT, SWITCH_CASES,
-    SWITCH_MAIN, SWITCH_OUTPUT, TYPED_LITERALS_OUTPUT, compiler, expect_status, run,
+    CHECKED_UPDATES_OUTPUT, Fixture, INTEGER_CONVERSIONS_OUTPUT, NUMERIC_NOTATION_OUTPUT,
+    STRUCT_OUTPUT, SWITCH_CASES, SWITCH_MAIN, SWITCH_OUTPUT, TYPED_LITERALS_OUTPUT, compiler,
+    expect_status, run,
 };
 
 #[derive(Clone, Debug)]
@@ -370,6 +371,100 @@ fn typed_literal_edits_invalidate_consumers_and_preserve_outputs() {
         "failed build ran a stale executable"
     );
     assert!(String::from_utf8_lossy(&failed.stderr).contains("invalid numeric suffix 'i7'"));
+    assert_eq!(
+        fs::read(&executable).expect("preserved executable"),
+        completed
+    );
+    assert_eq!(fixture.artifact_bytes(directory), current);
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn numeric_notation_crosses_whole_separate_and_source_free_packages() {
+    let serial = Fixture::numeric_notation();
+    let parallel = Fixture::numeric_notation();
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    std::thread::sleep(std::time::Duration::from_millis(1100));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, NUMERIC_NOTATION_OUTPUT);
+    assert_eq!(second.stdout, first.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+    let executable = format!("app/target/x86_64/app{}", std::env::consts::EXE_SUFFIX);
+    assert_eq!(
+        fs::read(serial.root.join(&executable)).expect("serial executable"),
+        fs::read(parallel.root.join(&executable)).expect("parallel executable")
+    );
+
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, NUMERIC_NOTATION_OUTPUT);
+    assert!(whole.stderr.is_empty());
+    let source_free = source_free_run(&serial);
+    expect_status(&source_free, 0);
+    assert_eq!(source_free.stdout, NUMERIC_NOTATION_OUTPUT);
+    assert!(source_free.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn numeric_notation_edits_invalidate_consumers_and_preserve_outputs() {
+    let fixture = Fixture::numeric_notation();
+    let selected = compiler();
+    expect_status(&run(&mut fixture.shuttle("build", &selected)), 0);
+    let directory = "app/target/x86_64/packages";
+    let previous = fixture.artifact_bytes(directory);
+    let executable = fixture.root.join(format!(
+        "app/target/x86_64/app{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let model_path = fixture.root.join("models/src/User.co");
+    let model = fs::read_to_string(&model_path).expect("numeric notation model source");
+    let changed = model.replace("value + 0o2i8", "value + 0o3i8");
+    assert_ne!(model, changed);
+    fixture.write("models/src/User.co", &changed);
+
+    let rebuilt = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&rebuilt, 0);
+    assert_eq!(
+        rebuilt.stdout,
+        b"240\n43\n18446744073709551615\n125\n44\n0\n8\n"
+    );
+    let progress = String::from_utf8_lossy(&rebuilt.stderr);
+    let current = fixture.artifact_bytes(directory);
+    for package in ["data-models", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: compiling {package} ")),
+            "{progress}"
+        );
+        assert_ne!(previous[package], current[package]);
+    }
+    for package in ["foundation", "tools"] {
+        assert!(
+            progress.contains(&format!("shuttle: reusing {package} ")),
+            "{progress}"
+        );
+        assert_eq!(previous[package], current[package]);
+    }
+    let completed = fs::read(&executable).expect("completed executable");
+
+    let invalid = changed.replace("value + 0o3i8", "value + 0o8i8");
+    assert_ne!(changed, invalid);
+    fixture.write("models/src/User.co", &invalid);
+    let failed = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&failed, 1);
+    assert!(
+        failed.stdout.is_empty(),
+        "failed build ran a stale executable"
+    );
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("invalid digit in base-8"));
     assert_eq!(
         fs::read(&executable).expect("preserved executable"),
         completed

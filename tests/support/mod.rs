@@ -16,6 +16,7 @@ pub struct Fixture {
 pub const STRUCT_OUTPUT: &[u8] = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n100\n101\n104\ninitial\n";
 pub const CHECKED_UPDATES_OUTPUT: &[u8] = b"7\n22\n1\n21\n42\n";
 pub const INTEGER_CONVERSIONS_OUTPUT: &[u8] = b"4464\n65535\n0\n44\n255\n";
+pub const NUMERIC_NOTATION_OUTPUT: &[u8] = b"240\n42\n18446744073709551615\n125\n44\n0\n8\n";
 pub const TYPED_LITERALS_OUTPUT: &[u8] = b"7\n42\n18446744073709551615\n0.5\n44\n0\n8\n";
 pub const SWITCH_OUTPUT: &[u8] =
     b"ready\nready\nactive\nfallback\ndone\nfallback\nsmall\nother\nmaximum\n";
@@ -425,6 +426,55 @@ static func Main() {
   println(Values.Wrapped());
   println(Helper.Saturated());
   println(Which(1i8));
+}
+",
+        );
+        fixture
+    }
+
+    pub fn numeric_notation() -> Self {
+        let fixture = Self::new();
+        fixture.write(
+            "core/src/data/Record.co",
+            r"
+static final uint8 Mask = 0b1111_0000u8;
+static final uint64 Maximum = 0xFFFF_FFFF_FFFF_FFFFu64;
+static final float32 Scale = 1.25e2f32;
+static func Main(): int32 { return 98; }
+",
+        );
+        fixture.write(
+            "models/src/User.co",
+            r"
+import foundation.data::Record;
+static final int64 Wide = Record.Mask;
+static final uint64 Maximum = Record.Maximum;
+static final float64 Scale = Record.Scale;
+static func Add(int64 value): int64 { return value + 0o2i8; }
+",
+        );
+        fixture.write(
+            "tools/src/Helper.co",
+            r"
+static func Wrapped(): int8 { return int8::wrap(0x12Cu16); }
+static func Saturated(): uint8 { return uint8::sat(-0b1i16); }
+",
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r"
+import models::User as Values;
+import tools::Helper;
+static func Which(int8 value): int32 { return 8; }
+static func Which(int64 value): int32 { return 64; }
+static func Main() {
+  println(Values.Wide);
+  println(Values.Add(40));
+  println(Values.Maximum);
+  println(Values.Scale);
+  println(Helper.Wrapped());
+  println(Helper.Saturated());
+  println(Which(0b1i8));
 }
 ",
         );

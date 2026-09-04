@@ -33,9 +33,39 @@ change was required. Stage 31 coordination is complete following the compiler's
 separately authorized 31.4 exit audit on 2026-09-04. No Shuttle production
 change was required. Stage 32 coordination is complete following the compiler's
 separately authorized 32.4 exit audit on 2026-09-04. No Shuttle production or
-compatibility change was required, and no later coordinated stage is active.
+compatibility change was required. Stage 33 coordination is complete following
+the compiler's separately authorized 33.4 exit audit on 2026-09-04. No Shuttle
+production or compatibility change was required.
 
 ## Scheduled work
+
+### Stage 33: Numeric literal notation coordination
+
+- [x] Record the compiler-owned scientific-notation, integer-base, separator,
+  suffix-interaction, canonical-representation, compatibility, package, and
+  non-goal boundaries. Approved 2026-09-04; this is documentation-only and
+  Shuttle production code remains unchanged.
+- [x] Record compiler 33.2 frontend completion. Both 226-test compiler matrices
+  retain all 30 public protocol/toolchain and 26 native Shuttle cases. No
+  Shuttle production, fixture, schema, or compatibility change was required.
+- [x] With compiler 33.3, verify constants and executable behavior across
+  whole-project, separate-package, and source-free compilation without parsing
+  numeric syntax or compiler internals.
+- [x] Prove affected-only invalidation, failed-output preservation, and
+  relocated serial/parallel x86-64/wasm32 determinism with both compiler
+  configurations.
+- [x] Pass ordinary Rust, Rust 1.85, formatting, Clippy, shared
+  protocol/native, editor, documentation, and repository gates during the
+  coordinated compiler 33.4 exit audit.
+
+  Completed with compiler 33.4 on 2026-09-04. Both compilers pass all 31 public
+  toolchain and 28 native cases inside their 232-test matrices. All 43 ordinary
+  Rust tests, Rust 1.85 checking, warning-denied Clippy, Rust/C++ formatting, 10
+  editor tests per compiler, all 100 local Markdown target checks, and
+  repository hygiene gates pass. Compatibility versions and Shuttle production
+  code remain unchanged.
+
+  **Stage 33 coordination is complete.** No later stage is active.
 
 ### Stage 32: Typed numeric literal coordination
 
@@ -62,7 +92,7 @@ compatibility change was required, and no later coordinated stage is active.
   nine-test editor runs, documentation links, and repository hygiene gates
   pass. No production code or compatibility version changed.
 
-  **Stage 32 coordination is complete.** No later coordinated stage is active.
+  **Stage 32 coordination is complete.** Stage 33 coordination is tracked above.
 
 ### Stage 31: MIR optimization coordination
 
