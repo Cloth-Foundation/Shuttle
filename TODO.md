@@ -27,9 +27,45 @@ Stage 28 coordination is complete following the separately authorized
 output preservation, and determinism are verified. Stage 29 coordination is
 complete following the separately authorized
 [29.4 exit audit](docs/testing.md#coordinated-294-checked-runtime-arithmetic-exit-audit)
-on 2026-09-03. No later Shuttle stage is assigned or active.
+on 2026-09-03. Stage 30 coordination is complete following the compiler's
+separately authorized 30.4 exit audit on 2026-09-03. No Shuttle production
+change was required.
 
 ## Scheduled work
+
+### Stage 30: Integer conversion-mode coordination
+
+- [x] Record the compiler-owned `Target::wrap(value)` and
+  `Target::sat(value)` contract and its unchanged compatibility boundary.
+  Approved 2026-09-03; Shuttle production code is unchanged.
+- [x] Record compiler 30.2 frontend and constant verification. Both 188-test
+  compiler configurations, 43 ordinary Rust tests, Rust 1.85, formatting,
+  warning-denied Clippy, editor, and repository gates pass. Runtime package
+  behavior was assigned to 30.3; Shuttle production code is unchanged.
+- [x] With compiler 30.3, verify runtime and scalar-constant results through the
+  public process boundary without parsing source expressions or conversion
+  metadata in Shuttle.
+- [x] Prove whole/separate/source-free equivalence, affected-only invalidation,
+  unrelated reuse, output preservation, and relocated serial/parallel artifact
+  determinism with both compiler configurations.
+
+  Completed 2026-09-03. The shared matrix now contains 29 public
+  protocol/toolchain and 24 native cases per compiler. Integer conversion
+  fixtures prove runtime and constant results, whole/separate/source-free
+  equivalence, affected-only invalidation, unrelated reuse, failure
+  preservation, and deterministic x86-64/wasm32 artifacts. Shuttle remains an
+  opaque artifact coordinator and no production or compatibility change was
+  required.
+- [x] Pass ordinary Rust, Rust 1.85, formatting, Clippy, shared protocol/native,
+  editor, and repository gates during the coordinated 30.4 exit audit.
+
+  Completed 2026-09-03. Both compiler configurations pass all 200 CTests,
+  including all 29 shared protocol/toolchain and 24 native Shuttle cases. All
+  43 ordinary Rust tests, Rust 1.85 checking, Rust formatting, warning-denied
+  Clippy, editor tests, C++ formatting, and repository whitespace gates pass.
+  Relocated serial/parallel artifacts and whole, separate, and source-free
+  behavior remain deterministic. Stage 30 coordination is complete with every
+  compatibility version unchanged.
 
 ### Stage 29: Checked-arithmetic runtime ABI coordination
 

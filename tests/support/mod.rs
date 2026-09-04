@@ -15,6 +15,7 @@ pub struct Fixture {
 
 pub const STRUCT_OUTPUT: &[u8] = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n100\n101\n104\ninitial\n";
 pub const CHECKED_UPDATES_OUTPUT: &[u8] = b"7\n22\n1\n21\n42\n";
+pub const INTEGER_CONVERSIONS_OUTPUT: &[u8] = b"4464\n65535\n0\n44\n255\n";
 pub const SWITCH_OUTPUT: &[u8] =
     b"ready\nready\nactive\nfallback\ndone\nfallback\nsmall\nother\nmaximum\n";
 pub const SWITCH_CASES: &[&str] = &["Ready", "ready", "_Done"];
@@ -329,6 +330,51 @@ static func Main() {
   println(user.Value);
   int32 local = 40;
   println(++local + local++ - 40);
+}
+",
+        );
+        fixture
+    }
+
+    pub fn integer_conversions() -> Self {
+        let fixture = Self::new();
+        fixture.write(
+            "core/src/data/Record.co",
+            r"
+static final int8 Wrapped = int8::wrap(300);
+static final uint8 Limited = uint8::sat(999);
+static func Saturate(int64 value): uint16 { return uint16::sat(value); }
+static func Main(): int32 { return 98; }
+",
+        );
+        fixture.write(
+            "models/src/User.co",
+            r"
+import foundation.data::Record;
+static final int8 Constant = Record.Wrapped;
+static func Convert(int64 value): uint16 { return uint16::wrap(value); }
+static func Foundation(int64 value): uint16 { return Record.Saturate(value); }
+",
+        );
+        fixture.write(
+            "tools/src/Helper.co",
+            r"
+import base.data::Record;
+static func Adjust(int64 value): uint8 { return uint8::sat(value); }
+static func Constant(): uint8 { return Record.Limited; }
+",
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r"
+import models::User as ModelUser;
+import tools::Helper;
+static func Main() {
+  println(ModelUser.Convert(70000));
+  println(ModelUser.Foundation(70000));
+  println(Helper.Adjust(-5));
+  println(ModelUser.Constant);
+  println(Helper.Constant());
 }
 ",
         );

@@ -27,6 +27,27 @@ Stage 29 coordination is complete following the separately authorized
 [29.4 exit audit](docs/testing.md#coordinated-294-checked-runtime-arithmetic-exit-audit)
 on 2026-09-03. The compiler/runtime transition and every coordinated verification
 gate pass.
+Stage 30 coordination is complete following the compiler's separately
+authorized 30.4 exit audit on 2026-09-03. No Shuttle implementation or protocol
+change was required.
+
+## Stage 30: Integer conversion-mode coordination
+
+Status: **complete — compiler 30.4 exit audit passed on 2026-09-03**
+
+The compiler-owned contract defines `Target::wrap(value)` and
+`Target::sat(value)` as integer-only primitive meta conversions. Shuttle will
+treat their object code and scalar constant values as opaque artifact content.
+
+Artifact format 4, compiler ABI 4, runtime ABI 3, protocol 2, receipt schema 1,
+and manifest schema 1 remain unchanged. Stage 30 adds no runtime helper,
+capability field, receipt field, manifest behavior, or scheduler behavior.
+
+The coordinated exit verifies whole/separate/source-free equivalence,
+affected-only invalidation, output preservation, relocated serial/parallel
+determinism, and all Rust/shared tests against both compiler configurations.
+Language syntax, conversion semantics, HIR/MIR, LLVM lowering, and diagnostics
+remain compiler responsibilities.
 
 ## Stage 29: Checked-arithmetic runtime ABI coordination
 

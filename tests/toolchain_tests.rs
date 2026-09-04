@@ -40,6 +40,29 @@ fn checked_updates_have_deterministic_cross_target_artifacts() {
     }
 }
 
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn integer_conversions_have_deterministic_cross_target_artifacts() {
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let serial = Fixture::integer_conversions();
+        let parallel = Fixture::integer_conversions();
+        parallel.reverse_dependencies();
+        for (fixture, jobs) in [(&serial, "1"), (&parallel, "4")] {
+            let checked = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&checked, 0);
+            assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+        }
+        let directory = format!("app/target/{target}/check/packages");
+        assert_eq!(
+            serial.artifact_bytes(&directory),
+            parallel.artifact_bytes(&directory)
+        );
+    }
+}
+
 #[derive(Clone, Debug)]
 struct ProtocolArtifact {
     name: String,
