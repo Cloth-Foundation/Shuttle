@@ -16,8 +16,8 @@ use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
 use support::{
     CHECKED_UPDATES_OUTPUT, Fixture, INTEGER_CONVERSIONS_OUTPUT, NUMERIC_NOTATION_OUTPUT,
-    STRUCT_OUTPUT, SWITCH_CASES, SWITCH_MAIN, SWITCH_OUTPUT, TYPED_LITERALS_OUTPUT, compiler,
-    expect_status, run,
+    STRUCT_OUTPUT, SWITCH_CASES, SWITCH_MAIN, SWITCH_OUTPUT, TYPED_ERRORS_OUTPUT,
+    TYPED_LITERALS_OUTPUT, compiler, expect_status, run,
 };
 
 #[derive(Clone, Debug)]
@@ -411,6 +411,121 @@ fn numeric_notation_crosses_whole_separate_and_source_free_packages() {
     expect_status(&source_free, 0);
     assert_eq!(source_free.stdout, NUMERIC_NOTATION_OUTPUT);
     assert!(source_free.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn typed_errors_cross_whole_separate_and_source_free_packages() {
+    let serial = Fixture::typed_errors();
+    let parallel = Fixture::typed_errors();
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, TYPED_ERRORS_OUTPUT);
+    assert_eq!(second.stdout, first.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, TYPED_ERRORS_OUTPUT);
+    assert!(whole.stderr.is_empty());
+    let source_free = source_free_run_with_dependencies(
+        &serial,
+        &[
+            ("models", "data-models"),
+            ("tools", "tools"),
+            ("foundation", "foundation"),
+        ],
+    );
+    expect_status(&source_free, 0);
+    assert_eq!(source_free.stdout, TYPED_ERRORS_OUTPUT);
+    assert!(source_free.stderr.is_empty());
+
+    let failure = Fixture::typed_errors();
+    failure.write(
+        "app/src/Main.co",
+        r"
+import foundation::InvalidInput;
+import models::Calculator;
+static func Main(): int32 throws InvalidInput, DivisionByZero {
+  println(Calculator.Divide(42, 0));
+  return 0;
+}
+",
+    );
+    let failed = run(&mut failure.shuttle("run", &selected));
+    expect_status(&failed, 1);
+    assert!(failed.stdout.is_empty());
+    let expected_error = if cfg!(windows) {
+        b"cloth error: DivisionByZero\r\n".as_slice()
+    } else {
+        b"cloth error: DivisionByZero\n".as_slice()
+    };
+    assert_eq!(failed.stderr, expected_error);
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn typed_error_edits_invalidate_consumers_and_preserve_outputs() {
+    let fixture = Fixture::typed_errors();
+    let selected = compiler();
+    expect_status(&run(&mut fixture.shuttle("build", &selected)), 0);
+    let directory = "app/target/x86_64/packages";
+    let previous = fixture.artifact_bytes(directory);
+    let executable = fixture.root.join(format!(
+        "app/target/x86_64/app{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+
+    let calculator_path = fixture.root.join("models/src/Calculator.co");
+    let calculator = fs::read_to_string(&calculator_path).expect("typed error consumer source");
+    let changed_calculator =
+        calculator.clone() + "\nstatic func Validate() throws InvalidInput {}\n";
+    fixture.write("models/src/Calculator.co", &changed_calculator);
+
+    let rebuilt = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&rebuilt, 0);
+    assert_eq!(rebuilt.stdout, TYPED_ERRORS_OUTPUT);
+    let progress = String::from_utf8_lossy(&rebuilt.stderr);
+    let current = fixture.artifact_bytes(directory);
+    for package in ["data-models", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: compiling {package} ")),
+            "{progress}"
+        );
+        assert_ne!(previous[package], current[package]);
+    }
+    for package in ["foundation", "tools"] {
+        assert!(
+            progress.contains(&format!("shuttle: reusing {package} ")),
+            "{progress}"
+        );
+        assert_eq!(previous[package], current[package]);
+    }
+    let completed = fs::read(&executable).expect("completed executable");
+
+    let invalid = changed_calculator.replace("throws InvalidInput, DivisionByZero", "throws int32");
+    assert_ne!(changed_calculator, invalid);
+    fixture.write("models/src/Calculator.co", &invalid);
+    let failed = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&failed, 1);
+    assert!(
+        failed.stdout.is_empty(),
+        "failed build ran a stale executable"
+    );
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("is not a non-null error"));
+    assert_eq!(
+        fs::read(&executable).expect("preserved executable"),
+        completed
+    );
+    assert_eq!(fixture.artifact_bytes(directory), current);
 }
 
 #[test]
@@ -1008,6 +1123,10 @@ fn switch_coverage_failures_preserve_outputs_and_default_accepts_added_cases() {
 }
 
 fn source_free_run(fixture: &Fixture) -> Output {
+    source_free_run_with_dependencies(fixture, &[("models", "data-models"), ("tools", "tools")])
+}
+
+fn source_free_run_with_dependencies(fixture: &Fixture, dependencies: &[(&str, &str)]) -> Output {
     let selected = compiler();
     let mut artifacts = artifact_records(fixture);
     // Hide only test-owned sources. The next compile and link must use package
@@ -1037,16 +1156,10 @@ fn source_free_run(fixture: &Fixture) -> Output {
         .arg(&app_path)
         .args(["--package", "app", "0.1.0"])
         .arg(fixture.root.join("app/src"))
-        .args([
-            "--entry",
-            "Main.co",
-            "--dependency",
-            "models",
-            "data-models",
-            "--dependency",
-            "tools",
-            "tools",
-        ]);
+        .args(["--entry", "Main.co"]);
+    for (alias, package) in dependencies {
+        compile.args(["--dependency", alias, package]);
+    }
     for artifact in &artifacts {
         if artifact.name == "app" {
             continue;

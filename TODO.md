@@ -35,9 +35,47 @@ change was required. Stage 32 coordination is complete following the compiler's
 separately authorized 32.4 exit audit on 2026-09-04. No Shuttle production or
 compatibility change was required. Stage 33 coordination is complete following
 the compiler's separately authorized 33.4 exit audit on 2026-09-04. No Shuttle
-production or compatibility change was required.
+production or compatibility change was required. Stage 34 coordination is
+complete following the compiler's 34.4 exit audit on 2026-09-05.
 
 ## Scheduled work
+
+### Stage 34: Typed error coordination
+
+- [x] Record the compiler-owned error declarations, throw expressions, typed
+  public and inferred private throws sets, automatic propagation, constructor
+  failure, inheritance/interface rules, division-by-zero migration, portable
+  ABI, compatibility targets, verification, and non-goal boundaries.
+
+  Approved with compiler 34.1 on 2026-09-04. The implementation targets artifact
+  format 5, compiler ABI 5, and runtime ABI 4 while protocol 2, receipt schema 1,
+  and manifest schema 1 remain unchanged. This checkpoint changes documentation
+  only; active compiler and runtime compatibility constants remain unchanged.
+
+- [x] With compiler 34.2, retain complete public error kinds and throws sets in
+  deterministic compiler-owned interfaces and verify whole/source-free semantic
+  agreement without Shuttle parsing or adapting error metadata.
+- [x] With compiler 34.3, verify the format-5/compiler-ABI-5/runtime-ABI-4
+  transition, native result/error lowering, terminal reporting, and
+  division-by-zero behavior through public compiler and linker boundaries.
+- [x] Prove relocated serial/parallel x86-64/wasm32 determinism with both
+  compiler configurations. Existing integrity, stale-artifact, and
+  failed-output matrices remain green; typed-error-specific expansion belongs
+  to the 34.4 exit audit.
+- [x] Pass ordinary Rust, Rust 1.85, formatting, Clippy, shared protocol/native,
+  editor, documentation, link, and repository gates during compiler 34.4.
+
+  Completed with compiler 34.4 on 2026-09-05. Both compiler configurations pass
+  all 32 public protocol/toolchain and 30 native cases inside their 249-test
+  matrices. Whole, separate, and source-free execution agree; one-job and four-
+  job artifacts agree on x86-64 and wasm32; native success and failure reporting
+  pass; and a typed-error API edit proves affected-only invalidation and
+  failed-output preservation. All 43 ordinary Rust tests, Rust 1.85 checking,
+  warning-denied Clippy, formatting, editor, documentation, link, and repository
+  gates pass. Shuttle production retains only the opaque compatibility
+  expectation at 5/5/4.
+
+  **Stage 34 coordination is complete.**
 
 ### Stage 33: Numeric literal notation coordination
 
@@ -65,7 +103,7 @@ production or compatibility change was required.
   repository hygiene gates pass. Compatibility versions and Shuttle production
   code remain unchanged.
 
-  **Stage 33 coordination is complete.** No later stage is active.
+  **Stage 33 coordination is complete.** Stage 34 coordination is tracked above.
 
 ### Stage 32: Typed numeric literal coordination
 
