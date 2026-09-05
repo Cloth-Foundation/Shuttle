@@ -42,13 +42,17 @@ fn main() {
     let mode = env::var("SHUTTLE_STUB_MODE").unwrap_or_default();
     if query {
         let capabilities = format!(
-            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[5],\"compiler_id\":\"{COMPILER_ID}\",\"operations\":[\"compile\",\"inspect\",\"link\",\"reuse\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
+            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[5],\"compiler_id\":\"{COMPILER_ID}\",\"standard_library\":{{\"package\":\"cloth\",\"version\":\"0.1.0\"}},\"operations\":[\"compile\",\"inspect\",\"link\",\"reuse\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
         );
         match mode.as_str() {
             "query-version" => println!("{{\"schema\":1,\"protocols\":[1]}}"),
             "query-old-artifact-format" => println!(
                 "{}",
                 capabilities.replace("\"artifact_formats\":[5]", "\"artifact_formats\":[4]")
+            ),
+            "query-wrong-standard-library" => println!(
+                "{}",
+                capabilities.replace("\"package\":\"cloth\"", "\"package\":\"other\"")
             ),
             "query-no-newline" => print!("{capabilities}"),
             "query-stderr" => {

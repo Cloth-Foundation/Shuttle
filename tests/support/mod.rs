@@ -531,7 +531,7 @@ static func Main(): int32 throws InvalidInput, DivisionByZero {
 
     pub fn artifact_bytes(&self, relative: &str) -> BTreeMap<String, Vec<u8>> {
         let directory = self.root.join(relative);
-        ["app", "data-models", "foundation", "tools"]
+        ["app", "cloth", "data-models", "foundation", "tools"]
             .into_iter()
             .map(|package| {
                 let path = directory.join(format!("{package}.cpa"));
@@ -594,6 +594,39 @@ fn copy_tree(source: &Path, destination: &Path) {
             fs::copy(entry.path(), target).expect("copy fixture file");
         }
     }
+}
+
+pub fn pair_compiler_with_standard_library(source_compiler: &Path, destination_compiler: &Path) {
+    let source_directory = source_compiler.parent().expect("source compiler directory");
+    let metadata: serde_json::Value = serde_json::from_slice(
+        &fs::read(source_directory.join("cloth-toolchain.json"))
+            .expect("source compiler toolchain metadata"),
+    )
+    .expect("parse source compiler toolchain metadata");
+    let relative_manifest = metadata["standard_library"]["manifest"]
+        .as_str()
+        .expect("standard library manifest selection");
+    let source_manifest = fs::canonicalize(source_directory.join(relative_manifest))
+        .expect("selected standard library manifest");
+    let source_library = source_manifest
+        .parent()
+        .expect("standard library directory");
+    let destination_directory = destination_compiler
+        .parent()
+        .expect("destination compiler directory");
+    let destination_library = destination_directory.join("standard-library");
+    fs::create_dir_all(&destination_library).expect("destination standard library directory");
+    fs::copy(&source_manifest, destination_library.join("Shuttle.toml"))
+        .expect("copy standard library manifest");
+    copy_tree(
+        &source_library.join("src"),
+        &destination_library.join("src"),
+    );
+    fs::write(
+        destination_directory.join("cloth-toolchain.json"),
+        "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+    )
+    .expect("destination compiler toolchain metadata");
 }
 
 // Bound every child, and drain both streams concurrently so diagnostics cannot

@@ -37,8 +37,50 @@ compatibility change was required. Stage 33 coordination is complete following
 the compiler's separately authorized 33.4 exit audit on 2026-09-04. No Shuttle
 production or compatibility change was required. Stage 34 coordination is
 complete following the compiler's 34.4 exit audit on 2026-09-05.
+Stage 35 coordination is complete following the separately authorized 35.4
+exit audit on 2026-09-05.
 
 ## Scheduled work
+
+### Stage 35: Standard library coordination
+
+- [x] Record the compiler-paired `cloth` package, reserved source root and
+  dependency alias, executable-free bootstrap, automatic direct dependency,
+  exact version/digest inputs, diagnostics ownership, compatibility,
+  distribution, and non-goals.
+
+  Approved with compiler 35.1 on 2026-09-05. The standard library remains
+  explicitly imported in Cloth source, Shuttle does not parse its APIs, and
+  compatibility remains artifact/compiler/runtime 5/5/4 with protocol 2,
+  receipt schema 1, and manifest schema 1. This checkpoint changes
+  documentation only.
+
+- [x] During 35.2, keep production behavior unchanged while compiler and
+  standard-library fixtures prove the ordinary artifact boundary carries the
+  `cloth` package correctly.
+
+  Completed with compiler 35.2 on 2026-09-05. Existing protocol-2 interface and
+  object package boundaries carry `cloth` without a Shuttle production change.
+- [x] During 35.3, locate the distribution paired with the selected compiler,
+  inject it into every ordinary package without a manifest entry, reject user
+  `cloth` aliases and replacement attempts, and retain deterministic graph,
+  progress, reuse, invalidation, and atomic publication behavior.
+
+  Completed 2026-09-05. The selected compiler's adjacent schema-1 metadata
+  names one exact `cloth` distribution. Shuttle validates and injects it into
+  every ordinary package, reserves the user alias and package identity, and
+  uses the existing artifact, cache, scheduler, and linker paths.
+- [x] Verify compiler-only packages, standard-library consumers, source-free
+  artifacts, exact dependency edits, failed-output preservation, relocated
+  one-job/four-job builds, x86-64/wasm32 outputs, and native execution.
+- [x] Pass ordinary Rust, Rust 1.85, formatting, warning-denied Clippy, shared
+  compiler, standard-library, editor, documentation, and repository gates in
+  35.4.
+
+  Completed 2026-09-05. Both compiler configurations pass all 35 public
+  toolchain cases and 32 native cases inside their 255-test matrices. All 49
+  ordinary Rust tests and coordinated quality gates pass. See the
+  [exit record](docs/testing.md#stage-354-standard-library-foundation-exit-audit).
 
 ### Stage 34: Typed error coordination
 
@@ -373,5 +415,4 @@ These items require a future roadmap stage before implementation:
 - build scripts, plugins, and arbitrary command execution;
 - incremental compilation, local shared caches, remote caches, and distributed
   builds;
-- standard-library installation and toolchain distribution; and
 - editor and language-server build integration.

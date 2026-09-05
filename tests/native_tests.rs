@@ -14,10 +14,11 @@ use std::process::{Command, Output};
 use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
+use shuttle::standard_library::inject_standard_library;
 use support::{
     CHECKED_UPDATES_OUTPUT, Fixture, INTEGER_CONVERSIONS_OUTPUT, NUMERIC_NOTATION_OUTPUT,
     STRUCT_OUTPUT, SWITCH_CASES, SWITCH_MAIN, SWITCH_OUTPUT, TYPED_ERRORS_OUTPUT,
-    TYPED_LITERALS_OUTPUT, compiler, expect_status, run,
+    TYPED_LITERALS_OUTPUT, compiler, expect_status, pair_compiler_with_standard_library, run,
 };
 
 #[derive(Clone, Debug)]
@@ -612,7 +613,7 @@ fn struct_edits_invalidate_native_consumers_and_preserve_independent_reuse() {
                 "stale {package} artifact"
             );
         }
-        for package in ["foundation", "tools"] {
+        for package in ["cloth", "foundation", "tools"] {
             assert!(
                 progress.contains(&format!("shuttle: reusing {package} ")),
                 "{progress}"
@@ -628,7 +629,7 @@ fn struct_edits_invalidate_native_consumers_and_preserve_independent_reuse() {
         let progress = String::from_utf8_lossy(&unchanged.stderr);
         assert_eq!(
             progress.matches("shuttle: reusing ").count(),
-            4,
+            5,
             "{progress}"
         );
         assert!(!progress.contains("shuttle: compiling "), "{progress}");
@@ -784,8 +785,9 @@ static func Main() {
         assert_eq!(rebuilt.stdout, expected);
         let progress = String::from_utf8_lossy(&rebuilt.stderr);
         let current = fixture.artifact_bytes(directory);
-        for package in ["foundation", "tools", "data-models", "app"] {
-            let changed = upstream || matches!(package, "data-models" | "app");
+        for package in ["cloth", "foundation", "tools", "data-models", "app"] {
+            let changed =
+                package != "cloth" && (upstream || matches!(package, "data-models" | "app"));
             let action = if changed { "compiling" } else { "reusing" };
             assert!(
                 progress.contains(&format!("shuttle: {action} {package} ")),
@@ -800,7 +802,7 @@ static func Main() {
             String::from_utf8_lossy(&warm.stderr)
                 .matches("shuttle: reusing ")
                 .count(),
-            4
+            5
         );
         assert_eq!(current, fixture.artifact_bytes(directory));
         expect_stale_link_rejected(&fixture, stale);
@@ -1001,7 +1003,7 @@ fn switch_edits_invalidate_native_consumers_and_reject_stale_links() {
             );
             assert_ne!(current[package], previous[package], "stale {package}");
         }
-        for package in ["foundation", "tools"] {
+        for package in ["cloth", "foundation", "tools"] {
             assert!(
                 progress.contains(&format!("shuttle: reusing {package} ")),
                 "{progress}"
@@ -1017,7 +1019,7 @@ fn switch_edits_invalidate_native_consumers_and_reject_stale_links() {
         let progress = String::from_utf8_lossy(&unchanged.stderr);
         assert_eq!(
             progress.matches("shuttle: reusing ").count(),
-            4,
+            5,
             "{progress}"
         );
         assert!(!progress.contains("shuttle: compiling "));
@@ -1249,7 +1251,7 @@ fn builds_and_runs_only_the_selected_root_entry() {
         .expect("package artifacts")
         .collect::<Result<Vec<_>, _>>()
         .expect("package artifact entries");
-    assert_eq!(artifacts.len(), 4);
+    assert_eq!(artifacts.len(), 5);
     assert!(artifacts.iter().all(|entry| {
         entry.path().is_file() && entry.path().extension().is_some_and(|value| value == "cpa")
     }));
@@ -1266,6 +1268,132 @@ fn builds_and_runs_only_the_selected_root_entry() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn links_and_reuses_the_implicit_standard_library() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "app/Shuttle.toml",
+        "manifest-version = 1\n\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[executable]\nentry = \"Main.co\"\n",
+    );
+    fixture.write(
+        "app/src/Main.co",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+    );
+    let selected = compiler();
+    let first = run(&mut fixture.shuttle("run", &selected));
+    expect_status(&first, 0);
+    assert_eq!(first.stdout, b"6\n");
+    assert!(first.stderr.is_empty());
+    for package in ["cloth", "app"] {
+        assert!(
+            fixture
+                .root
+                .join(format!("app/target/x86_64/packages/{package}.cpa"))
+                .is_file()
+        );
+    }
+
+    let second = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&second, 0);
+    assert_eq!(second.stdout, b"6\n");
+    let progress = String::from_utf8(second.stderr).expect("reuse progress");
+    assert_eq!(progress.matches("shuttle: reusing ").count(), 2);
+    assert!(!progress.contains("shuttle: compiling "));
+
+    let whole = Fixture::new();
+    whole.write(
+        "app/Shuttle.toml",
+        "manifest-version = 1\n\n[package]\nname = \"app\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n\n[executable]\nentry = \"Main.co\"\n",
+    );
+    whole.write(
+        "app/src/Main.co",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+    );
+    let graph = resolve_package_graph(&whole.manifest()).expect("whole-project graph");
+    let graph = inject_standard_library(&graph, &selected, "cloth", "0.1.0")
+        .expect("whole-project standard library");
+    let request = build_request(&graph, ProjectCommand::Build, Target::X86_64)
+        .expect("whole-project request");
+    let output = request
+        .output_path()
+        .expect("whole-project executable")
+        .to_path_buf();
+    fs::create_dir_all(output.parent().expect("output parent")).expect("create output parent");
+    let compiled = run(Command::new(&selected)
+        .current_dir(&whole.root)
+        .args(request.arguments()));
+    expect_status(&compiled, 0);
+    assert!(compiled.stdout.is_empty() && compiled.stderr.is_empty());
+    let whole_output = run(&mut Command::new(output));
+    expect_status(&whole_output, 0);
+    assert_eq!(whole_output.stdout, first.stdout);
+    assert!(whole_output.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn broken_standard_library_preserves_completed_consumer_outputs() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "app/Shuttle.toml",
+        "manifest-version = 1\n\n[package]\nname = \"app\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n\n[executable]\nentry = \"Main.co\"\n",
+    );
+    fixture.write(
+        "app/src/Main.co",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+    );
+    let selected = compiler();
+    let toolchain_directory = fixture.root.join("toolchain");
+    fs::create_dir(&toolchain_directory).expect("toolchain directory");
+    let paired_compiler =
+        toolchain_directory.join(format!("clothc{}", std::env::consts::EXE_SUFFIX));
+    fs::copy(&selected, &paired_compiler).expect("copy paired compiler");
+    pair_compiler_with_standard_library(&selected, &paired_compiler);
+
+    let built = run(&mut fixture.shuttle("run", &paired_compiler));
+    expect_status(&built, 0);
+    assert_eq!(built.stdout, b"6\n");
+    assert!(built.stderr.is_empty());
+
+    let package_directory = fixture.root.join("app/target/x86_64/packages");
+    let cloth_artifact = package_directory.join("cloth.cpa");
+    let app_artifact = package_directory.join("app.cpa");
+    let executable = fixture
+        .root
+        .join("app/target/x86_64")
+        .join(format!("app{}", std::env::consts::EXE_SUFFIX));
+    let previous_cloth = fs::read(&cloth_artifact).expect("completed cloth artifact");
+    let previous_app = fs::read(&app_artifact).expect("completed app artifact");
+    let previous_executable = fs::read(&executable).expect("completed executable");
+
+    let math = toolchain_directory.join("standard-library/src/math/Math.co");
+    let mut source = fs::read_to_string(&math).expect("paired Math source");
+    source.push_str("\nfunc Broken(): int32 { return missing; }\n");
+    fs::write(math, source).expect("break paired Math source");
+    let failed = run(&mut fixture.shuttle("run", &paired_compiler));
+    expect_status(&failed, 1);
+    assert!(failed.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("Math.co:"));
+    assert_eq!(
+        fs::read(&cloth_artifact).expect("preserved cloth artifact"),
+        previous_cloth
+    );
+    assert_eq!(
+        fs::read(&app_artifact).expect("preserved app artifact"),
+        previous_app
+    );
+    assert_eq!(
+        fs::read(&executable).expect("preserved executable"),
+        previous_executable
+    );
+
+    let preserved = run(&mut Command::new(executable));
+    expect_status(&preserved, 0);
+    assert_eq!(preserved.stdout, b"6\n");
+    assert!(preserved.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
 fn native_build_reuses_unchanged_packages_and_repairs_a_corrupt_candidate() {
     let fixture = Fixture::new();
     let selected_compiler = compiler();
@@ -1274,7 +1402,7 @@ fn native_build_reuses_unchanged_packages_and_repairs_a_corrupt_candidate() {
     let unchanged = run(&mut fixture.visible_shuttle("build", &selected_compiler));
     expect_status(&unchanged, 0);
     let progress = String::from_utf8(unchanged.stderr).expect("reuse progress");
-    assert_eq!(progress.matches("shuttle: reusing").count(), 4);
+    assert_eq!(progress.matches("shuttle: reusing").count(), 5);
     assert!(!progress.contains("shuttle: compiling"));
 
     let foundation = fixture
@@ -1291,6 +1419,21 @@ fn native_build_reuses_unchanged_packages_and_repairs_a_corrupt_candidate() {
         assert!(
             progress.contains(&format!("shuttle: reusing {package} ")),
             "unchanged consumer was not reused: {progress}"
+        );
+    }
+
+    let cloth = fixture.root.join("app/target/x86_64/packages/cloth.cpa");
+    let mut bytes = fs::read(&cloth).expect("standard-library artifact");
+    *bytes.last_mut().expect("artifact byte") ^= 1;
+    fs::write(&cloth, bytes).expect("corrupt standard-library candidate");
+    let repaired = run(&mut fixture.visible_shuttle("build", &selected_compiler));
+    expect_status(&repaired, 0);
+    let progress = String::from_utf8(repaired.stderr).expect("repair progress");
+    assert!(progress.contains("shuttle: compiling cloth "));
+    for package in ["foundation", "data-models", "tools", "app"] {
+        assert!(
+            progress.contains(&format!("shuttle: reusing {package} ")),
+            "unchanged standard-library consumer was not reused: {progress}"
         );
     }
 }
@@ -1387,7 +1530,7 @@ fn relocated_native_builds_are_byte_identical() {
             == fs::read(second.root.join(&executable)).expect("second binary"),
         "relocated native builds differ"
     );
-    for package in ["app", "data-models", "foundation", "tools"] {
+    for package in ["app", "cloth", "data-models", "foundation", "tools"] {
         let relative = format!("app/target/x86_64/packages/{package}.cpa");
         assert_eq!(
             fs::read(first.root.join(&relative)).expect("first artifact"),
@@ -1403,7 +1546,7 @@ fn malformed_link_inputs_fail_without_replacing_outputs() {
     let fixture = Fixture::new();
     expect_status(&run(&mut fixture.shuttle("build", &compiler())), 0);
     let artifacts = artifact_records(&fixture);
-    assert_eq!(artifacts.len(), 4);
+    assert_eq!(artifacts.len(), 5);
     let output = fixture.root.join(format!(
         "app/target/x86_64/invalid{}",
         std::env::consts::EXE_SUFFIX

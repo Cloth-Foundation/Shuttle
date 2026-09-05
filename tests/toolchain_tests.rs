@@ -15,7 +15,10 @@ use std::process::Command;
 use serde::Deserialize;
 use shuttle::compiler::{ProjectCommand, Target, build_request};
 use shuttle::graph::resolve_package_graph;
-use support::{Fixture, SWITCH_CASES, SWITCH_MAIN, compiler, expect_status, run};
+use support::{
+    Fixture, SWITCH_CASES, SWITCH_MAIN, compiler, expect_status,
+    pair_compiler_with_standard_library, run,
+};
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST"]
@@ -149,6 +152,13 @@ struct ReceiptPackage {
 #[derive(Debug, Deserialize)]
 struct ArtifactReceipt {
     artifact_id: String,
+    package: ReceiptPackage,
+    dependencies: Vec<ReceiptDependency>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReceiptDependency {
+    alias: String,
     package: ReceiptPackage,
 }
 
@@ -713,7 +723,7 @@ fn struct_interface_artifacts_are_deterministic_and_invalidate_after_edits() {
                     "stale {package} artifact"
                 );
             }
-            for package in ["foundation", "tools"] {
+            for package in ["cloth", "foundation", "tools"] {
                 assert!(
                     progress.contains(&format!("shuttle: reusing {package} ")),
                     "{progress}"
@@ -730,7 +740,7 @@ fn struct_interface_artifacts_are_deterministic_and_invalidate_after_edits() {
             let progress = String::from_utf8_lossy(&unchanged.stderr);
             assert_eq!(
                 progress.matches("shuttle: reusing ").count(),
-                4,
+                5,
                 "{progress}"
             );
             assert!(!progress.contains("shuttle: checking "), "{progress}");
@@ -912,14 +922,164 @@ fn checks_the_complete_graph_and_a_library_without_artifacts() {
         .expect("persistent check artifacts")
         .collect::<Result<Vec<_>, _>>()
         .expect("check artifact entries");
-    assert_eq!(check_artifacts.len(), 4);
+    assert_eq!(check_artifacts.len(), 5);
     let library_artifacts = fs::read_dir(fixture.root.join("tools/target/x86_64/check/packages"))
         .expect("library check artifacts")
         .collect::<Result<Vec<_>, _>>()
         .expect("library artifact entries");
-    assert_eq!(library_artifacts.len(), 2);
+    assert_eq!(library_artifacts.len(), 3);
     for package in ["models", "core"] {
         assert!(!fixture.root.join(package).join("target").exists());
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn injects_the_compiler_paired_standard_library_without_manifest_boilerplate() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "app/Shuttle.toml",
+        "manifest-version = 1\n\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[executable]\nentry = \"Main.co\"\n",
+    );
+    fixture.write(
+        "app/src/Main.co",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+    );
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let checked = run(fixture
+            .shuttle("check", &selected)
+            .args(["--target", target]));
+        expect_status(&checked, 0);
+        assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+        let directory = fixture
+            .root
+            .join(format!("app/target/{target}/check/packages"));
+        assert!(directory.join("cloth.cpa").is_file());
+        assert!(directory.join("app.cpa").is_file());
+    }
+
+    let app = fixture
+        .root
+        .join("app/target/x86_64/check/packages/app.cpa");
+    let inspected = run(Command::new(&selected)
+        .args([
+            "--shuttle-protocol",
+            "2",
+            "--operation",
+            "inspect",
+            "--input",
+        ])
+        .arg(app));
+    expect_status(&inspected, 0);
+    let receipt: ArtifactReceipt =
+        serde_json::from_slice(&inspected.stdout).expect("application receipt");
+    assert!(receipt.dependencies.iter().any(|dependency| {
+        dependency.alias == "cloth"
+            && dependency.package.name == "cloth"
+            && dependency.package.version == "0.1.0"
+    }));
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn checks_the_paired_standard_library_without_a_self_dependency() {
+    let fixture = Fixture::new();
+    let selected = compiler();
+    let toolchain_directory = fixture.root.join("toolchain");
+    fs::create_dir(&toolchain_directory).expect("toolchain directory");
+    let paired_compiler =
+        toolchain_directory.join(format!("clothc{}", std::env::consts::EXE_SUFFIX));
+    fs::copy(&selected, &paired_compiler).expect("copy paired compiler");
+    pair_compiler_with_standard_library(&selected, &paired_compiler);
+    let manifest = toolchain_directory.join("standard-library/Shuttle.toml");
+    let checked = run(Command::new(env!("CARGO_BIN_EXE_shuttle"))
+        .args(["check", "--manifest-path"])
+        .arg(&manifest)
+        .arg("--compiler")
+        .arg(&paired_compiler)
+        .arg("--quiet"));
+    expect_status(&checked, 0);
+    assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+
+    let artifact =
+        toolchain_directory.join("standard-library/target/x86_64/check/packages/cloth.cpa");
+    assert!(artifact.is_file());
+    let inspected = run(Command::new(&paired_compiler)
+        .args([
+            "--shuttle-protocol",
+            "2",
+            "--operation",
+            "inspect",
+            "--input",
+        ])
+        .arg(artifact));
+    expect_status(&inspected, 0);
+    let receipt: ArtifactReceipt =
+        serde_json::from_slice(&inspected.stdout).expect("standard library receipt");
+    assert_eq!(receipt.package.name, "cloth");
+    assert!(receipt.dependencies.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn standard_library_edits_invalidate_exact_consumers_on_both_targets() {
+    for target in ["x86_64", "wasm32"] {
+        let fixture = Fixture::new();
+        fixture.write(
+            "app/Shuttle.toml",
+            "manifest-version = 1\n\n[package]\nname = \"app\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n\n[executable]\nentry = \"Main.co\"\n",
+        );
+        fixture.write(
+            "app/src/Main.co",
+            "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+        );
+        let selected = compiler();
+        let toolchain_directory = fixture.root.join("toolchain");
+        fs::create_dir(&toolchain_directory).expect("toolchain directory");
+        let paired_compiler =
+            toolchain_directory.join(format!("clothc{}", std::env::consts::EXE_SUFFIX));
+        fs::copy(&selected, &paired_compiler).expect("copy paired compiler");
+        pair_compiler_with_standard_library(&selected, &paired_compiler);
+
+        let first = run(fixture
+            .shuttle("check", &paired_compiler)
+            .args(["--target", target]));
+        expect_status(&first, 0);
+        assert!(first.stdout.is_empty() && first.stderr.is_empty());
+
+        let unchanged = run(fixture
+            .visible_shuttle("check", &paired_compiler)
+            .args(["--target", target]));
+        expect_status(&unchanged, 0);
+        let progress = String::from_utf8(unchanged.stderr).expect("reuse progress");
+        assert_eq!(progress.matches("shuttle: reusing ").count(), 2);
+        assert!(!progress.contains("shuttle: checking "));
+
+        let math = toolchain_directory.join("standard-library/src/math/Math.co");
+        let mut source = fs::read_to_string(&math).expect("paired Math source");
+        source.push_str("\n// change the selected standard-library source digest\n");
+        fs::write(math, source).expect("edit paired Math source");
+        let changed = run(fixture
+            .visible_shuttle("check", &paired_compiler)
+            .args(["--target", target]));
+        expect_status(&changed, 0);
+        let progress = String::from_utf8(changed.stderr).expect("invalidation progress");
+        for package in ["cloth", "app"] {
+            assert!(
+                progress.contains(&format!("shuttle: checking {package} ")),
+                "missing invalidation for {package}: {progress}"
+            );
+        }
+        assert!(!progress.contains("shuttle: reusing "));
+
+        let warm = run(fixture
+            .visible_shuttle("check", &paired_compiler)
+            .args(["--target", target]));
+        expect_status(&warm, 0);
+        let progress = String::from_utf8(warm.stderr).expect("warm reuse progress");
+        assert_eq!(progress.matches("shuttle: reusing ").count(), 2);
+        assert!(!progress.contains("shuttle: checking "));
     }
 }
 
@@ -1010,13 +1170,14 @@ fn check_separates_targets_and_invalidates_a_changed_compiler() {
         .args(["--target", "x86_64"]));
     expect_status(&x86, 0);
     let progress = String::from_utf8(x86.stderr).expect("target progress");
-    assert_eq!(progress.matches("shuttle: checking").count(), 4);
+    assert_eq!(progress.matches("shuttle: checking").count(), 5);
     assert!(!progress.contains("shuttle: reusing"));
 
     let changed_compiler = fixture
         .root
         .join(format!("changed-clothc{}", std::env::consts::EXE_SUFFIX));
     fs::copy(&selected_compiler, &changed_compiler).expect("copy compiler");
+    pair_compiler_with_standard_library(&selected_compiler, &changed_compiler);
     OpenOptions::new()
         .append(true)
         .open(&changed_compiler)
@@ -1028,7 +1189,7 @@ fn check_separates_targets_and_invalidates_a_changed_compiler() {
         .args(["--target", "wasm32"]));
     expect_status(&changed, 0);
     let progress = String::from_utf8(changed.stderr).expect("compiler progress");
-    assert_eq!(progress.matches("shuttle: checking").count(), 4);
+    assert_eq!(progress.matches("shuttle: checking").count(), 5);
     assert!(!progress.contains("shuttle: reusing"));
 }
 

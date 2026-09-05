@@ -37,6 +37,7 @@ access registries, select build profiles, or apply workspace policy.
 - [Build execution and progress](docs/build_execution.md)
 - [Stage 24 local artifact reuse](docs/proposals/stage_24_reuse.md)
 - [Stage 24 bounded parallel scheduling](docs/proposals/stage_24_parallel.md)
+- [Compiler-paired toolchain metadata](docs/toolchain.md)
 - [Implementation language](docs/implementation_language.md)
 
 ## Build and test
@@ -79,8 +80,10 @@ dependencies, and `check`, `build`, and `run` use compiler protocol version 2
 for deterministic separate compilation and linking. Protocol version 1 remains
 available to older clients and explicit compiler tests. Unchanged local package
 artifacts are reused only after compiler-owned validation, and independent ready
-packages run under a bounded deterministic scheduler. Remote dependencies and
-registries are not implemented.
+packages run under a bounded deterministic scheduler. The standard library
+paired with the chosen compiler is injected automatically as `cloth`; user
+manifests cannot select or replace it. Remote dependencies and registries are
+not implemented.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.

@@ -29,7 +29,25 @@ fn stub(fixture: &Fixture) -> PathBuf {
         .arg("-o")
         .arg(&executable));
     expect_status(&output, 0);
+    write_stub_toolchain(&executable);
     executable
+}
+
+fn write_stub_toolchain(compiler: &Path) {
+    let directory = compiler.parent().expect("compiler directory");
+    let library = directory.join("standard-library");
+    fs::create_dir_all(library.join("src/math")).expect("standard library source directory");
+    fs::write(
+        library.join("Shuttle.toml"),
+        "manifest-version = 1\n\n[package]\nname = \"cloth\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n",
+    )
+    .expect("standard library manifest");
+    fs::write(library.join("src/math/Math.co"), "class {}\n").expect("standard library source");
+    fs::write(
+        directory.join("cloth-toolchain.json"),
+        "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+    )
+    .expect("toolchain metadata");
 }
 
 fn command(fixture: &Fixture, compiler: &Path, action: &str, mode: &str) -> Command {
@@ -77,7 +95,7 @@ fn compiled_packages(fixture: &Fixture) -> Vec<String> {
 }
 
 fn package_artifacts(fixture: &Fixture) -> Vec<Vec<u8>> {
-    ["foundation", "data-models", "tools", "app"]
+    ["cloth", "foundation", "data-models", "tools", "app"]
         .map(|package| {
             fs::read(
                 fixture
@@ -107,12 +125,170 @@ fn invalid_graphs_fail_before_even_querying_the_compiler() {
 }
 
 #[test]
+fn reserves_the_implicit_standard_library_dependency_alias() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    for alias in ["cloth", "Cloth", "CLOTH"] {
+        fixture.write(
+            "app/Shuttle.toml",
+            &format!(
+                "manifest-version = 1\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n[dependencies]\n{alias} = {{ path = \"../core\" }}\n"
+            ),
+        );
+        let output = run(&mut command(&fixture, &compiler, "check", ""));
+        expect_status(&output, 1);
+        assert!(output.stdout.is_empty());
+        assert!(
+            String::from_utf8(output.stderr)
+                .expect("diagnostic")
+                .contains("reserved for the compiler-paired standard library")
+        );
+    }
+    assert!(!fixture.root.join("calls.log").exists());
+}
+
+#[test]
+fn rejects_missing_metadata_and_standard_library_replacements() {
+    let missing = Fixture::new();
+    let missing_compiler = stub(&missing);
+    fs::remove_file(missing.root.join("cloth-toolchain.json")).expect("remove metadata");
+    let output = run(&mut command(&missing, &missing_compiler, "check", ""));
+    expect_status(&output, 2);
+    assert!(
+        String::from_utf8(output.stderr)
+            .expect("metadata diagnostic")
+            .contains("toolchain metadata")
+    );
+    assert_eq!(phases(&missing), ["query"]);
+
+    let replacement = Fixture::new();
+    let replacement_compiler = stub(&replacement);
+    let manifest = replacement.root.join("core/Shuttle.toml");
+    let contents = fs::read_to_string(&manifest)
+        .expect("foundation manifest")
+        .replace("name = \"foundation\"", "name = \"cloth\"");
+    fs::write(manifest, contents).expect("replace package identity");
+    let output = run(&mut command(
+        &replacement,
+        &replacement_compiler,
+        "check",
+        "",
+    ));
+    expect_status(&output, 2);
+    assert!(
+        String::from_utf8(output.stderr)
+            .expect("replacement diagnostic")
+            .contains("reserved for the compiler-paired standard library")
+    );
+    assert_eq!(phases(&replacement), ["query"]);
+}
+
+#[test]
+fn rejects_malformed_or_incompatible_toolchain_metadata() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    let metadata_path = fixture.root.join("cloth-toolchain.json");
+    let cases = [
+        ("not JSON\n", "invalid JSON"),
+        (
+            "{\"schema\":1,\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+            "invalid JSON",
+        ),
+        (
+            "{\"schema\":2,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+            "unsupported schema 2",
+        ),
+        (
+            "{\"schema\":1,\"extra\":true,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+            "invalid JSON",
+        ),
+        (
+            "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.2.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+            "does not match the selected compiler",
+        ),
+        (
+            "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/../Shuttle.toml\"}}\n",
+            "normalized relative '/' path",
+        ),
+        (
+            "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library\\\\Shuttle.toml\"}}\n",
+            "normalized relative '/' path",
+        ),
+        (
+            "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/cloth.toml\"}}\n",
+            "must name 'Shuttle.toml'",
+        ),
+        (
+            "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"missing/Shuttle.toml\"}}\n",
+            "standard library distribution",
+        ),
+    ];
+    for (metadata, expected) in cases {
+        fs::write(&metadata_path, metadata).expect("replace toolchain metadata");
+        let output = run(&mut command(&fixture, &compiler, "check", ""));
+        expect_status(&output, 2);
+        assert!(output.stdout.is_empty());
+        let diagnostic = String::from_utf8(output.stderr).expect("toolchain diagnostic");
+        assert!(
+            diagnostic.contains(expected),
+            "missing {expected:?} in {diagnostic:?}"
+        );
+    }
+    assert!(phases(&fixture).iter().all(|phase| phase == "query"));
+    assert!(!fixture.root.join("app/target").exists());
+}
+
+#[test]
+fn rejects_invalid_standard_library_distributions() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    let manifest_path = fixture.root.join("standard-library/Shuttle.toml");
+    fixture.write(
+        "standard-library/other/Shuttle.toml",
+        "manifest-version = 1\n[package]\nname = \"other\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n",
+    );
+    fixture.write("standard-library/other/src/Other.co", "class {}\n");
+    let cases = [
+        (
+            "manifest-version = 1\n[package]\nname = \"other\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n",
+            "must define package 'cloth'",
+        ),
+        (
+            "manifest-version = 1\n[package]\nname = \"cloth\"\nversion = \"0.2.0\"\nsource-root = \"src\"\n",
+            "does not match compiler version",
+        ),
+        (
+            "manifest-version = 1\n[package]\nname = \"cloth\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n[executable]\nentry = \"math/Math.co\"\n",
+            "executable-free package 'cloth' with no dependencies",
+        ),
+        (
+            "manifest-version = 1\n[package]\nname = \"cloth\"\nversion = \"0.1.0\"\nsource-root = \"src\"\n[dependencies]\nother = { path = \"other\" }\n",
+            "executable-free package 'cloth' with no dependencies",
+        ),
+    ];
+    for (manifest, expected) in cases {
+        fs::write(&manifest_path, manifest).expect("replace standard library manifest");
+        let output = run(&mut command(&fixture, &compiler, "check", ""));
+        expect_status(&output, 2);
+        assert!(output.stdout.is_empty());
+        let diagnostic = String::from_utf8(output.stderr).expect("distribution diagnostic");
+        assert!(
+            diagnostic.contains(expected),
+            "missing {expected:?} in {diagnostic:?}"
+        );
+    }
+    assert!(phases(&fixture).iter().all(|phase| phase == "query"));
+    assert!(!fixture.root.join("app/target").exists());
+}
+
+#[test]
 fn rejects_incompatible_queries_without_compilation_or_output_creation() {
     let fixture = Fixture::new();
     let compiler = stub(&fixture);
     for mode in [
         "query-version",
         "query-old-artifact-format",
+        "query-wrong-standard-library",
         "query-no-newline",
         "query-stderr",
         "query-exit",
@@ -164,7 +340,7 @@ fn preserves_compiler_failures_and_reports_abnormal_status_with_context() {
         assert!(error.starts_with("fixture.co:3:5: error: stub rejection"));
         if mode == "compile-42" {
             assert!(
-                error.contains("foundation") && error.contains("compiler stub"),
+                error.contains("cloth") && error.contains("compiler stub"),
                 "{error}"
             );
             assert!(error.contains("42"));
@@ -195,12 +371,12 @@ fn runs_only_after_success_and_forwards_program_streams_and_status() {
     assert_eq!(
         phases(&fixture),
         [
-            "query", "compile", "compile", "compile", "compile", "link", "run"
+            "query", "compile", "compile", "compile", "compile", "compile", "link", "run"
         ]
     );
     assert_eq!(
         compiled_packages(&fixture),
-        ["foundation", "data-models", "tools", "app"]
+        ["cloth", "foundation", "data-models", "tools", "app"]
     );
 }
 
@@ -218,11 +394,12 @@ fn reports_build_progress_without_contaminating_program_output() {
     );
     let progress = String::from_utf8(output.stderr).expect("progress");
     let expected = [
-        "shuttle: preparing build for x86_64 (4 packages)",
-        "shuttle: compiling foundation v1.0.0 [1/4]",
-        "shuttle: compiling data-models v1.2.3-beta.1+local [2/4]",
-        "shuttle: compiling tools v0.2.0 [3/4]",
-        "shuttle: compiling app v0.1.0 [4/4]",
+        "shuttle: preparing build for x86_64 (5 packages)",
+        "shuttle: compiling cloth v0.1.0 [1/5]",
+        "shuttle: compiling foundation v1.0.0 [2/5]",
+        "shuttle: compiling data-models v1.2.3-beta.1+local [3/5]",
+        "shuttle: compiling tools v0.2.0 [4/5]",
+        "shuttle: compiling app v0.1.0 [5/5]",
         "shuttle: linking app",
         "shuttle: finished build for x86_64 in ",
         "shuttle: running ",
@@ -264,10 +441,11 @@ fn bounds_parallel_ready_packages_and_preserves_canonical_results() {
     let progress = String::from_utf8(output.stderr).expect("parallel progress");
     let expected = [
         "shuttle: scheduling with 2 jobs",
-        "shuttle: compiling foundation v1.0.0 [1/4]",
-        "shuttle: compiling data-models v1.2.3-beta.1+local [2/4]",
-        "shuttle: compiling tools v0.2.0 [3/4]",
-        "shuttle: compiling app v0.1.0 [4/4]",
+        "shuttle: compiling cloth v0.1.0 [1/5]",
+        "shuttle: compiling foundation v1.0.0 [2/5]",
+        "shuttle: compiling data-models v1.2.3-beta.1+local [3/5]",
+        "shuttle: compiling tools v0.2.0 [4/5]",
+        "shuttle: compiling app v0.1.0 [5/5]",
     ];
     let mut previous = 0;
     for message in expected {
@@ -307,10 +485,16 @@ fn parallel_failures_replay_the_same_canonical_diagnostic_as_one_job() {
             .replace("\r\n", "\n"),
         "data-models.co:3:5: error: parallel stub rejection\n"
     );
-    assert_eq!(compiled_packages(&serial), ["foundation", "data-models"]);
+    assert_eq!(
+        compiled_packages(&serial),
+        ["cloth", "foundation", "data-models"]
+    );
     let mut parallel_packages = compiled_packages(&parallel);
     parallel_packages.sort();
-    assert_eq!(parallel_packages, ["data-models", "foundation", "tools"]);
+    assert_eq!(
+        parallel_packages,
+        ["cloth", "data-models", "foundation", "tools"]
+    );
 }
 
 #[test]
@@ -325,11 +509,11 @@ fn reuses_every_unchanged_package_and_reports_validation() {
     expect_status(&second, 0);
     assert_eq!(
         phases(&fixture),
-        ["query", "reuse", "reuse", "reuse", "reuse", "link"]
+        ["query", "reuse", "reuse", "reuse", "reuse", "reuse", "link"]
     );
     assert!(compiled_packages(&fixture).is_empty());
     let progress = String::from_utf8(second.stderr).expect("progress");
-    for package in ["foundation", "data-models", "tools", "app"] {
+    for package in ["cloth", "foundation", "data-models", "tools", "app"] {
         assert!(
             progress.contains(&format!("shuttle: validating {package} "))
                 && progress.contains(&format!("shuttle: reusing {package} ")),
@@ -357,7 +541,9 @@ fn manifest_only_invalidation_stops_at_an_identical_artifact() {
     assert_eq!(compiled_packages(&fixture), ["foundation"]);
     assert_eq!(
         phases(&fixture),
-        ["query", "compile", "reuse", "reuse", "reuse", "link"]
+        [
+            "query", "reuse", "compile", "reuse", "reuse", "reuse", "link"
+        ]
     );
 }
 
@@ -391,7 +577,9 @@ fn malformed_local_state_is_ignored_without_invalidating_consumers() {
     assert_eq!(compiled_packages(&fixture), ["foundation"]);
     assert_eq!(
         phases(&fixture),
-        ["query", "compile", "reuse", "reuse", "reuse", "link"]
+        [
+            "query", "reuse", "compile", "reuse", "reuse", "reuse", "link"
+        ]
     );
     assert_eq!(
         fs::read_dir(state_directory)
@@ -446,6 +634,8 @@ fn compiler_precedence_is_explicit_then_sibling_then_path() {
     fs::copy(env!("CARGO_BIN_EXE_shuttle"), &shuttle).expect("copy Shuttle");
     fs::copy(&compiler, &sibling).expect("copy sibling compiler");
     fs::copy(&compiler, &fallback).expect("copy PATH compiler");
+    write_stub_toolchain(&sibling);
+    write_stub_toolchain(&fallback);
     for (explicit, expected) in [(true, &compiler), (false, &sibling), (false, &fallback)] {
         if expected == &fallback {
             fs::remove_file(&sibling).expect("remove test sibling");

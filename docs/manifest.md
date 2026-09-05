@@ -149,6 +149,8 @@ text_utils = { path = "../text-utils" }
 Each key is a source-visible dependency alias. An alias must match
 `[a-z][a-z0-9_]*` and must not be a Cloth keyword. Lowercase aliases make it
 clear that the prefix is a namespace rather than a public Cloth declaration.
+The alias `cloth`, including case variants, is reserved for the
+compiler-paired standard library and is invalid in user manifests.
 
 Each value is a table containing exactly one required string field, `path`.
 Equivalent standard TOML table syntax is accepted. String shorthand is not:
@@ -190,6 +192,11 @@ source-relative identities and do not prefix their own Shuttle package name.
 Only direct dependencies are visible. A package cannot import through a
 transitive dependency unless it declares that dependency itself. Imports are
 not re-exported.
+
+Shuttle supplies `cloth` as an implicit direct dependency of every ordinary
+package. It selects the exact package through the chosen compiler's
+[toolchain metadata](toolchain.md), not through this manifest. Standard-library
+types remain explicit source imports such as `cloth.math::Math`.
 
 A dependency alias that equals the first component of a local source package is
 ambiguous and is rejected by the compiler. Ordinary capitalization-based
