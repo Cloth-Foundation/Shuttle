@@ -18,6 +18,7 @@ pub const CHECKED_UPDATES_OUTPUT: &[u8] = b"7\n22\n1\n21\n42\n";
 pub const INTEGER_CONVERSIONS_OUTPUT: &[u8] = b"4464\n65535\n0\n44\n255\n";
 pub const NUMERIC_NOTATION_OUTPUT: &[u8] = b"240\n42\n18446744073709551615\n125\n44\n0\n8\n";
 pub const TYPED_LITERALS_OUTPUT: &[u8] = b"7\n42\n18446744073709551615\n0.5\n44\n0\n8\n";
+pub const TYPED_ERRORS_OUTPUT: &[u8] = b"7\n";
 pub const SWITCH_OUTPUT: &[u8] =
     b"ready\nready\nactive\nfallback\ndone\nfallback\nsmall\nother\nmaximum\n";
 pub const SWITCH_CASES: &[&str] = &["Ready", "ready", "_Done"];
@@ -475,6 +476,49 @@ static func Main() {
   println(Helper.Wrapped());
   println(Helper.Saturated());
   println(Which(0b1i8));
+}
+",
+        );
+        fixture
+    }
+
+    pub fn typed_errors() -> Self {
+        let fixture = Self::new();
+        let manifest =
+            fs::read_to_string(fixture.root.join("app/Shuttle.toml")).expect("app manifest");
+        fixture.write(
+            "app/Shuttle.toml",
+            &manifest.replace(
+                "tools = { path = \"../tools\" }",
+                "tools = { path = \"../tools\" }\nfoundation = { path = \"../core\" }",
+            ),
+        );
+        fixture.write(
+            "core/src/InvalidInput.co",
+            r"
+error {
+  InvalidInput(string message): Error(message) {}
+}
+",
+        );
+        fixture.write(
+            "models/src/Calculator.co",
+            r#"
+import foundation::InvalidInput;
+static func Divide(int32 left, int32 right): int32 throws InvalidInput, DivisionByZero {
+  if (left < 0) { throw InvalidInput("negative"); }
+  return left / right;
+}
+"#,
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r"
+import foundation::InvalidInput;
+import models::Calculator;
+static func Main(): int32 throws InvalidInput, DivisionByZero {
+  println(Calculator.Divide(42, 6));
+  return 0;
 }
 ",
         );

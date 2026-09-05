@@ -1,5 +1,64 @@
 # Shuttle verification
 
+## Coordinated compiler 34.4 typed error exit audit
+
+Verified on Windows on 2026-09-05 with development and ASan/UBSan compilers.
+Each compiler passes all **32 public compiler-protocol/toolchain cases** and
+**30 native Shuttle cases** inside its **249-test** matrix. All **43 ordinary
+Rust tests**, the Rust **1.85.0** minimum check, Rust formatting,
+warning-denied Clippy, editor checks, documentation links, and repository gates
+pass.
+
+The existing four-package fixture continues to prove whole-project, separate-
+package, and source-free equivalence plus relocated one-job/four-job x86-64 and
+wasm32 artifact determinism. The exit audit adds a typed-error public-contract
+edit: only the defining package and consumer rebuild, independent packages are
+reused, and a subsequent invalid throws declaration preserves every completed
+artifact and executable without running stale output.
+
+Artifact format **5**, compiler ABI **5**, and runtime ABI **4** remain active.
+Shuttle transports compiler-owned error metadata and object code opaquely;
+process protocol **2**, receipt schema **1**, manifest schema **1**, cache
+policy, and scheduling remain unchanged. **Stage 34 coordination is complete.**
+
+## Compiler 34.3 typed error integration
+
+Verified on Windows on 2026-09-05 with development and ASan/UBSan compilers.
+Each compiler passes all **32 public compiler-protocol/toolchain and 29 native
+Shuttle cases** inside its **241-test** matrix. All **43 ordinary Rust tests**,
+the Rust **1.85.0** minimum check, Rust formatting, and warning-denied Clippy
+pass.
+
+The typed-error fixture defines a public error in one package, exposes a
+throwing function from another, and consumes it from the application. Whole-
+project, separate-package, and source-free execution agree. Reversed dependency
+declarations and one-job/four-job schedules produce identical x86-64 and wasm32
+artifacts. Native execution verifies both the success value and stable
+`DivisionByZero` reporting through a throwing entry point.
+
+Artifact format **5**, compiler ABI **5**, and runtime ABI **4** are active.
+Shuttle still treats error metadata and object code as opaque compiler output;
+process protocol **2**, receipt schema **1**, manifest schema **1**, cache
+policy, and scheduling are unchanged. The separately authorized compiler 34.4
+audit is recorded above.
+
+## Compiler 34.1 typed error contract
+
+Recorded on 2026-09-04. Error declarations, throw expressions, throws-set
+analysis, automatic propagation, constructor failure, runtime reporting, and
+the result/error calling convention remain compiler-owned. Shuttle will treat
+the new interface metadata and object code as opaque artifacts.
+
+The approved implementation target is artifact format **5**, compiler ABI
+**5**, and runtime ABI **4** with unchanged process protocol **2**, receipt
+schema **1**, and manifest schema **1**. Compiler 34.1 changes documentation
+only: active compatibility remains format 4, compiler ABI 4, and runtime ABI 3,
+and no Shuttle source, fixture, schema, cache, scheduler, or launcher changes.
+All 101 local Markdown target checks and repository whitespace gates pass.
+
+Compiler 34.2, 34.3, and the separately authorized 34.4 audit are recorded
+above.
+
 ## Coordinated compiler 33.4 numeric literal notation exit audit
 
 Verified on Windows on 2026-09-04 with development and ASan/UBSan compilers.

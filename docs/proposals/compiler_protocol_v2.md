@@ -36,7 +36,7 @@ optional native tools are installed. Interface checking must work without
 them. Compiler/native-tool discovery failures are diagnosed only when the
 requested operation needs those tools.
 
-Shuttle requires protocol 2 and artifact format 4 for this workflow. A
+Shuttle requires protocol 2 and artifact format 5 for this workflow. A
 missing/malformed query or unsupported required capability fails clearly;
 there is no silent fallback to a whole-project build. Old clients retain v1.
 Tests invoke v1 explicitly as the equivalence oracle.

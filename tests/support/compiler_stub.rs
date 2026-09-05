@@ -42,13 +42,13 @@ fn main() {
     let mode = env::var("SHUTTLE_STUB_MODE").unwrap_or_default();
     if query {
         let capabilities = format!(
-            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[4],\"compiler_id\":\"{COMPILER_ID}\",\"operations\":[\"compile\",\"inspect\",\"link\",\"reuse\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
+            "{{\"schema\":1,\"protocols\":[1,2],\"artifact_formats\":[5],\"compiler_id\":\"{COMPILER_ID}\",\"operations\":[\"compile\",\"inspect\",\"link\",\"reuse\"],\"interface_targets\":[\"wasm32\",\"x86_64\"],\"object_targets\":[\"x86_64\"]}}"
         );
         match mode.as_str() {
             "query-version" => println!("{{\"schema\":1,\"protocols\":[1]}}"),
             "query-old-artifact-format" => println!(
                 "{}",
-                capabilities.replace("\"artifact_formats\":[4]", "\"artifact_formats\":[3]")
+                capabilities.replace("\"artifact_formats\":[5]", "\"artifact_formats\":[4]")
             ),
             "query-no-newline" => print!("{capabilities}"),
             "query-stderr" => {
@@ -150,7 +150,7 @@ fn emit_receipt(arguments: &[std::ffi::OsString]) {
         ARTIFACT_ID
     };
     let receipt = format!(
-        "{{\"schema\":1,\"artifact_format\":4,\"artifact_id\":\"{ARTIFACT_ID}\",\"kind\":\"{kind}\",\"package\":{{\"name\":\"{package}\",\"version\":\"{version}\"}},\"target\":\"{target}\",\"compiler_id\":\"{COMPILER_ID}\",\"dependencies\":[{}]}}",
+        "{{\"schema\":1,\"artifact_format\":5,\"artifact_id\":\"{ARTIFACT_ID}\",\"kind\":\"{kind}\",\"package\":{{\"name\":\"{package}\",\"version\":\"{version}\"}},\"target\":\"{target}\",\"compiler_id\":\"{COMPILER_ID}\",\"dependencies\":[{}]}}",
         dependencies.join(",")
     );
     let receipt = receipt.replace(ARTIFACT_ID, artifact_id).replace(
@@ -161,7 +161,7 @@ fn emit_receipt(arguments: &[std::ffi::OsString]) {
         Ok("receipt-no-newline") => print!("{receipt}"),
         Ok("receipt-old-artifact-format") => println!(
             "{}",
-            receipt.replace("\"artifact_format\":4", "\"artifact_format\":3")
+            receipt.replace("\"artifact_format\":5", "\"artifact_format\":4")
         ),
         Ok("receipt-trailing") => print!("{receipt}\ntrailing\n"),
         _ => println!("{receipt}"),

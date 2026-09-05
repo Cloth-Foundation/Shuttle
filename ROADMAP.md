@@ -43,6 +43,36 @@ Stage 33 coordination is complete following the compiler's separately
 authorized 33.4 exit audit on 2026-09-04. Shuttle remains opaque to source
 spelling and canonical compiler values.
 
+Stage 34 coordination is complete following the compiler's separately
+authorized 34.4 exit audit on 2026-09-05. Format-5 artifacts and the
+compiler/runtime ABI transition are integrated without a Shuttle schema or
+source-language policy change.
+
+## Stage 34: Typed error coordination
+
+Status: **complete — coordinated compiler 34.4 exit audit passed 2026-09-05**
+
+The compiler owns `error`, `throw`, `throws`, error-set analysis, construction,
+propagation, runtime reporting, and the target-neutral result/error ABI. Shuttle
+does not parse error syntax, inspect effect sets, adapt callable ABIs, or infer
+compatibility from source.
+
+Active compatibility is artifact format 5, compiler ABI 5, and runtime ABI 4.
+Process protocol 2, receipt schema 1, and manifest schema 1 remain unchanged.
+Shuttle will continue to treat interface and object artifacts as opaque data,
+using compiler capability checks, artifact validation, compiler/runtime digests,
+and normal rebuild behavior during the coordinated transition.
+
+Compiler 34.3 verifies public error declarations and throws sets across whole-
+project, separate-package, and source-free compilation. Relocated one-job and
+four-job builds produce equal x86-64/wasm32 artifacts, and native execution
+verifies successful propagation and stable uncaught-error reporting. Shuttle's
+only production change is its opaque compatibility expectation from 4/4/3 to
+5/5/4; manifests, receipts, cache policy, scheduling, and protocol remain
+unchanged. The 34.4 audit additionally proves typed-error-specific affected-
+only invalidation and failed-output preservation. All shared and repository
+quality gates pass.
+
 ## Stage 33: Numeric literal notation coordination
 
 Status: **complete — coordinated compiler 33.4 exit audit passed 2026-09-04**
