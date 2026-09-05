@@ -9,3 +9,4 @@ pub mod compiler;
 pub mod diagnostic;
 pub mod graph;
 pub mod manifest;
+pub mod standard_library;

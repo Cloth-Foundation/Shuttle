@@ -505,7 +505,15 @@ fn validate_dependencies(
         let declaration_position = position_for_offset(source, declaration_span.start);
         let raw_dependency = raw_dependency.into_inner();
         let mut valid = true;
-        if !is_dependency_alias(&alias) {
+        if alias.eq_ignore_ascii_case("cloth") {
+            diagnostics.push(Diagnostic::at_span(
+                manifest_path,
+                source,
+                declaration_span,
+                "dependency alias 'cloth' is reserved for the compiler-paired standard library",
+            ));
+            valid = false;
+        } else if !is_dependency_alias(&alias) {
             diagnostics.push(Diagnostic::at_span(
                 manifest_path,
                 source,

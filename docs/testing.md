@@ -1,5 +1,79 @@
 # Shuttle verification
 
+## Stage 35.4 standard-library foundation exit audit
+
+Verified on Windows on 2026-09-05 with development and ASan/UBSan compilers.
+Each compiler passes all 35 public toolchain cases and 32 native cases inside
+its 255-test repository matrix. All 49 ordinary Rust tests, Rust 1.85,
+formatting, warning-denied Clippy, editor checks, documentation links, and
+repository gates pass.
+
+Strict selection tests reject missing, malformed, duplicate-field, unknown-
+field, unsupported-schema, mismatched, non-normal, and missing-manifest
+metadata. Wrong package names or versions and distributions with an executable
+or dependencies also fail before package compilation. Case-only `cloth`
+aliases, replacement packages, incompatible capabilities, artifacts, targets,
+receipts, compiler identities, runtime identities, and link closures remain
+rejected by their owning boundary.
+
+Exact standard-library edits rebuild `cloth` and its consumer on x86-64 and
+wasm32, followed by complete warm reuse. Corrupt `cloth` candidates are repaired
+without rebuilding byte-identical consumers. Failed library compilation keeps
+the completed library artifact, consumer artifact, and executable and does not
+run stale output. Existing relocated one-job/four-job tests include `cloth` and
+prove byte-identical artifacts on both targets and byte-identical native
+executables. Compatibility remains 5/5/4 and protocol/receipt/manifest/
+toolchain schemas remain 2/1/1/1. **Stage 35 coordination is complete.**
+
+## Stage 35.3 standard-library integration
+
+Verified on Windows on 2026-09-05 with development and ASan/UBSan compilers.
+Shuttle now selects one exact `cloth` v0.1.0 distribution from strict metadata
+beside the chosen compiler, injects it directly into every ordinary package,
+and compiles the standard library without a self-dependency. User `cloth`
+aliases and replacement packages are rejected before application compilation.
+
+The real-toolchain matrix checks implicit `cloth.math::Math` imports and
+artifact receipts on x86-64 and wasm32, native linking and output, warm reuse,
+and standalone standard-library checking. Existing graph, scheduling, cache,
+invalidation, relocation, source-free, and failure tests include the implicit
+package.
+
+Both compiler configurations pass all 255 CTests, including 34 public
+toolchain cases and 31 native cases. All 47 ordinary Rust tests, Rust 1.85,
+formatting, warning-denied Clippy, and C++ formatting pass. Artifact/compiler/
+runtime compatibility remains 5/5/4, process/receipt/manifest schemas remain
+2/1/1, and toolchain metadata begins at schema 1.
+
+## Stage 35.2 compiler/library bootstrap coordination
+
+Recorded on 2026-09-05. Shuttle production behavior remains unchanged. The
+compiler-owned integration fixture passes the standard library through the
+existing protocol-2 package boundary, producing and consuming interface
+artifacts on x86-64 and wasm32 and independent object artifacts for native
+linking. A direct Shuttle check also accepts the executable-free `cloth` v0.1.0
+manifest without a self-dependency.
+
+Both development and ASan/UBSan compiler configurations pass all 255 CTests,
+including 32 public Shuttle toolchain cases and 30 native cases. Compatibility
+remains artifact/compiler/runtime 5/5/4 with protocol 2, receipt schema 1, and
+manifest schema 1. All 43 ordinary Rust tests, formatting, and warning-denied
+Clippy pass. Distribution selection and automatic graph injection remain
+separately authorized 35.3 work.
+
+## Stage 35.1 standard library coordination
+
+Recorded on 2026-09-05. The coordinated contract reserves `cloth` for the
+compiler-paired standard-library package and assigns later Shuttle work to
+automatic dependency injection, exact selection, reuse, invalidation, and
+diagnostics. Library types remain explicitly imported and Shuttle remains
+opaque to Cloth source and compiler artifact internals.
+
+This checkpoint changes documentation only. Artifact/compiler/runtime
+compatibility remains 5/5/4, and process protocol 2, receipt schema 1, and
+manifest schema 1 remain unchanged. Compiler/library bootstrap belongs to 35.2
+and Shuttle production integration belongs to separately authorized 35.3.
+
 ## Coordinated compiler 34.4 typed error exit audit
 
 Verified on Windows on 2026-09-05 with development and ASan/UBSan compilers.

@@ -27,7 +27,7 @@ It accepts no other argument and returns one UTF-8 JSON object plus LF, empty
 stderr, and status 0:
 
 ```json
-{"schema":1,"protocols":[1,2],"artifact_formats":[4],"compiler_id":"<64 lowercase hex digits>","operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
+{"schema":1,"protocols":[1,2],"artifact_formats":[5],"compiler_id":"<64 lowercase hex digits>","standard_library":{"package":"cloth","version":"0.1.0"},"operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
 ```
 
 The digest placeholder represents the artifact contract's actual compiler
@@ -62,6 +62,12 @@ metadata during inspect, reuse, and link. No process or Shuttle schema changes.
 Stage 24 adds `reuse` to this capability set. Its current-input validation,
 cache-miss status, and persistent-state rules are owned by
 [`stage_24_reuse.md`](stage_24_reuse.md).
+
+Stage 35.3 adds the required `standard_library` identity for current Shuttle
+clients. Capability schema 1 remains additive: older clients may ignore this
+field, while current clients require the exact `cloth` package and a valid
+semantic version before reading the adjacent
+[`cloth-toolchain.json`](../toolchain.md).
 
 ## Compile one package
 

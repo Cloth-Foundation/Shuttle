@@ -48,6 +48,57 @@ authorized 34.4 exit audit on 2026-09-05. Format-5 artifacts and the
 compiler/runtime ABI transition are integrated without a Shuttle schema or
 source-language policy change.
 
+Stage 35 coordination is complete following the separately authorized 35.4
+exit audit on 2026-09-05.
+
+## Stage 35: Standard library coordination
+
+Status: **complete — coordinated exit audit passed 2026-09-05**
+
+The compiler's Stage 35 standard-library contract establishes the `std`
+repository as the source of truth and reserves `cloth` as the exact standard-
+library import root.
+
+Objective: select and inject the standard library paired with the chosen
+compiler as a deterministic verified dependency, without manifest boilerplate,
+source parsing, namespace shadowing, or independent version solving.
+
+Shuttle supplies the official `cloth` package as an implicit direct
+dependency of every ordinary package. User manifests cannot declare the
+`cloth` alias or replace the selected library. The standard-library package is
+compiled without an executable or self-dependency; ordinary projects retain
+their current executable rules.
+
+Types remain explicitly imported, for example `cloth.math::Math`. Shuttle does
+not create a prelude, parse imports, enumerate APIs, or distinguish library
+members. Compiler-owned core types, `Error`, and runtime behavior are outside
+Shuttle.
+
+Artifact format 5, compiler ABI 5, runtime ABI 4, process protocol 2, receipt
+schema 1, and manifest schema 1 remain unchanged. Existing dependency identity,
+digest, closure, reuse, and atomic-publication machinery carries the exact
+standard-library input. Stage 35.3 adds the required standard-library identity
+to the additive capability response and introduces internal toolchain-metadata
+schema 1 without changing those compatibility versions.
+
+Deliverables:
+
+1. **35.1 — Contract (complete).** Record selection, reserved aliases,
+   injection, compatibility, diagnostics, distribution, and non-goals.
+2. **35.2 — Compiler/library bootstrap (complete).** Coordinate without adding Shuttle
+   production behavior; existing ordinary package boundaries must prove the
+   library artifacts are sufficient.
+3. **35.3 — Shuttle integration (complete).** Locate the compiler-paired
+   distribution, inject it into every ordinary package, reject shadowing,
+   reuse verified artifacts, and link consumers deterministically.
+4. **35.4 — Exit audit (complete).** Close missing, duplicate, incompatible, corrupt,
+   invalidation, relocation, concurrency, native/cross-target, documentation,
+   and repository quality matrices.
+
+Non-goals include registries, downloads, version solving, lockfiles,
+publication, signing, a manifest-selected standard-library version, arbitrary
+build execution, and Shuttle inspection of Cloth source or artifact internals.
+
 ## Stage 34: Typed error coordination
 
 Status: **complete — coordinated compiler 34.4 exit audit passed 2026-09-05**

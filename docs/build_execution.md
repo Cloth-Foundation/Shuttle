@@ -7,10 +7,11 @@ results.
 The default local command sequence is:
 
 ```text
-shuttle: preparing build for x86_64 (2 packages)
-shuttle: scheduling with 2 jobs
-shuttle: compiling foundation v1.0.0 [1/2]
-shuttle: compiling app v1.0.0 [2/2]
+shuttle: preparing build for x86_64 (3 packages)
+shuttle: scheduling with 3 jobs
+shuttle: compiling cloth v0.1.0 [1/3]
+shuttle: compiling foundation v1.0.0 [2/3]
+shuttle: compiling app v1.0.0 [3/3]
 shuttle: linking app
 shuttle: finished build for x86_64 in 842ms
 ```
@@ -25,6 +26,10 @@ deterministic build inputs or a machine-readable protocol. Package order follows
 Shuttle's deterministic dependency-level plan. Compiler diagnostics are spooled
 per process and replayed unchanged in canonical package order; Shuttle does not
 prefix or rewrite individual compiler diagnostic lines.
+
+The package count includes the compiler-paired `cloth` standard library. It is
+an ordinary artifact dependency in the build plan even though user manifests
+do not declare it.
 
 Pass `--quiet` after `check`, `build`, or `run` to suppress successful progress.
 It does not suppress compiler diagnostics or executed-program output.

@@ -13,6 +13,7 @@ use crate::compiler::{
 use crate::diagnostic::Diagnostic;
 use crate::graph::resolve_package_graph;
 use crate::manifest::resolve_manifest_path;
+use crate::standard_library::PACKAGE_NAME as STANDARD_LIBRARY_PACKAGE_NAME;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -86,12 +87,14 @@ pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure>
         exit_code: 1,
         diagnostics,
     })?;
-    validate_project_command(&graph, project_command, options.target).map_err(|diagnostic| {
-        CommandFailure {
-            exit_code: 1,
-            diagnostics: vec![diagnostic],
-        }
-    })?;
+    if graph.root_package != STANDARD_LIBRARY_PACKAGE_NAME {
+        validate_project_command(&graph, project_command, options.target).map_err(
+            |diagnostic| CommandFailure {
+                exit_code: 1,
+                diagnostics: vec![diagnostic],
+            },
+        )?;
+    }
     let compiler =
         select_compiler(options.compiler.as_deref(), current_directory).map_err(|diagnostic| {
             CommandFailure {

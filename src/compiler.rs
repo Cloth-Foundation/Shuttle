@@ -20,6 +20,7 @@ use tempfile::NamedTempFile;
 
 use crate::diagnostic::Diagnostic;
 use crate::graph::PackageGraph;
+use crate::standard_library::inject_standard_library;
 
 const PROTOCOL_VERSION: &str = "1";
 
@@ -318,9 +319,16 @@ struct Capabilities {
     protocols: Vec<u32>,
     artifact_formats: Vec<u32>,
     compiler_id: String,
+    standard_library: StandardLibraryCapability,
     operations: Vec<String>,
     interface_targets: Vec<String>,
     object_targets: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StandardLibraryCapability {
+    package: String,
+    version: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -476,13 +484,22 @@ pub fn execute_graph(
             "native executable output currently supports only target 'x86_64'".to_owned(),
         ));
     }
-    let progress = BuildProgress::start(progress_mode, command, target, graph.packages.len());
     let capabilities = query_capabilities(compiler)?;
     validate_capabilities(&capabilities, target, command)?;
-    let order = topological_order(graph)?;
+    let graph = inject_standard_library(
+        graph,
+        compiler,
+        &capabilities.standard_library.package,
+        &capabilities.standard_library.version,
+    )
+    .map_err(process_error)?;
+    validate_project_command(&graph, command, target)
+        .map_err(|diagnostic| process_error(diagnostic.message().to_owned()))?;
+    let progress = BuildProgress::start(progress_mode, command, target, graph.packages.len());
+    let order = topological_order(&graph)?;
     let effective_jobs = jobs.min(order.len().max(1));
     progress.scheduling(effective_jobs);
-    let workspace = create_build_workspace(graph, command, target)?;
+    let workspace = create_build_workspace(&graph, command, target)?;
     let artifact_kind = if command == ProjectCommand::Check {
         "interface"
     } else {
@@ -491,7 +508,7 @@ pub fn execute_graph(
     let produced = compile_packages(
         compiler,
         &PackageCompilation {
-            graph,
+            graph: &graph,
             target,
             artifact_kind,
             compiler_id: &capabilities.compiler_id,
@@ -504,11 +521,11 @@ pub fn execute_graph(
     )?;
     if command != ProjectCommand::Check {
         progress.linking(&graph.root_package);
-        link_executable(compiler, graph, target, &produced)?;
+        link_executable(compiler, &graph, target, &produced)?;
     }
     progress.finished();
     if command == ProjectCommand::Run {
-        let output = executable_output(graph, target)?;
+        let output = executable_output(&graph, target)?;
         progress.running(&output);
         run_executable(&output)?;
     }
@@ -1188,6 +1205,8 @@ fn validate_capabilities(
         || !capabilities.protocols.contains(&2)
         || !capabilities.artifact_formats.contains(&ARTIFACT_FORMAT)
         || !valid_digest(&capabilities.compiler_id)
+        || capabilities.standard_library.package != "cloth"
+        || semver::Version::parse(&capabilities.standard_library.version).is_err()
         || !["compile", "inspect", "link", "reuse"]
             .iter()
             .all(|required| {
