@@ -196,7 +196,8 @@ not re-exported.
 Shuttle supplies `cloth` as an implicit direct dependency of every ordinary
 package. It selects the exact package through the chosen compiler's
 [toolchain metadata](toolchain.md), not through this manifest. Standard-library
-types remain explicit source imports such as `cloth.math::Math`.
+types recursively beneath `cloth.lang` require no source import. Other areas
+remain explicit imports such as `cloth.math::Math`.
 
 A dependency alias that equals the first component of a local source package is
 ambiguous and is rejected by the compiler. Ordinary capitalization-based

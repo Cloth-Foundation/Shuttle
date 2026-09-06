@@ -1276,12 +1276,12 @@ fn links_and_reuses_the_implicit_standard_library() {
     );
     fixture.write(
         "app/src/Main.co",
-        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let selected = compiler();
     let first = run(&mut fixture.shuttle("run", &selected));
     expect_status(&first, 0);
-    assert_eq!(first.stdout, b"6\n");
+    assert_eq!(first.stdout, b"6\ninvalid argument\ninvalid state\n");
     assert!(first.stderr.is_empty());
     for package in ["cloth", "app"] {
         assert!(
@@ -1294,7 +1294,7 @@ fn links_and_reuses_the_implicit_standard_library() {
 
     let second = run(&mut fixture.visible_shuttle("run", &selected));
     expect_status(&second, 0);
-    assert_eq!(second.stdout, b"6\n");
+    assert_eq!(second.stdout, b"6\ninvalid argument\ninvalid state\n");
     let progress = String::from_utf8(second.stderr).expect("reuse progress");
     assert_eq!(progress.matches("shuttle: reusing ").count(), 2);
     assert!(!progress.contains("shuttle: compiling "));
@@ -1306,10 +1306,10 @@ fn links_and_reuses_the_implicit_standard_library() {
     );
     whole.write(
         "app/src/Main.co",
-        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let graph = resolve_package_graph(&whole.manifest()).expect("whole-project graph");
-    let graph = inject_standard_library(&graph, &selected, "cloth", "0.1.0")
+    let graph = inject_standard_library(&graph, &selected, "cloth", "0.2.0")
         .expect("whole-project standard library");
     let request = build_request(&graph, ProjectCommand::Build, Target::X86_64)
         .expect("whole-project request");

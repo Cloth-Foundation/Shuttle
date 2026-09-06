@@ -943,7 +943,7 @@ fn injects_the_compiler_paired_standard_library_without_manifest_boilerplate() {
     );
     fixture.write(
         "app/src/Main.co",
-        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let selected = compiler();
     for target in ["x86_64", "wasm32"] {
@@ -977,8 +977,53 @@ fn injects_the_compiler_paired_standard_library_without_manifest_boilerplate() {
     assert!(receipt.dependencies.iter().any(|dependency| {
         dependency.alias == "cloth"
             && dependency.package.name == "cloth"
-            && dependency.package.version == "0.1.0"
+            && dependency.package.version == "0.2.0"
     }));
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
+fn resolves_paired_standard_library_prelude_from_source_free_artifacts() {
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let serial = Fixture::named("prelude serial");
+        let parallel = Fixture::named("prelude parallel");
+        for (fixture, jobs) in [(&serial, "1"), (&parallel, "4")] {
+            fixture.write(
+                "app/Shuttle.toml",
+                "manifest-version = 1\n\n[package]\nname = \"app\"\nversion = \"0.1.0\"\n\n[executable]\nentry = \"Main.co\"\n",
+            );
+            fixture.write(
+                "app/src/Main.co",
+                "static func Main() { println(PreludeProbe.Value()); }\n",
+            );
+            let toolchain_directory = fixture.root.join("toolchain");
+            fs::create_dir(&toolchain_directory).expect("toolchain directory");
+            let paired_compiler =
+                toolchain_directory.join(format!("clothc{}", std::env::consts::EXE_SUFFIX));
+            fs::copy(&selected, &paired_compiler).expect("copy paired compiler");
+            pair_compiler_with_standard_library(&selected, &paired_compiler);
+            fixture.write(
+                "toolchain/standard-library/src/lang/deep/PreludeProbe.co",
+                "static func Value(): int32 { return 36; }\n",
+            );
+
+            let checked = run(fixture
+                .shuttle("check", &paired_compiler)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&checked, 0);
+            assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+        }
+
+        let directory = format!("app/target/{target}/check/packages");
+        for package in ["cloth", "app"] {
+            let relative = format!("{directory}/{package}.cpa");
+            assert_eq!(
+                fs::read(serial.root.join(&relative)).expect("serial prelude artifact"),
+                fs::read(parallel.root.join(&relative)).expect("parallel prelude artifact")
+            );
+        }
+    }
 }
 
 #[test]

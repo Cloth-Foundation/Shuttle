@@ -51,6 +51,49 @@ source-language policy change.
 Stage 35 coordination is complete following the separately authorized 35.4
 exit audit on 2026-09-05.
 
+Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
+
+## Stage 36: Standard-library prelude coordination
+
+Status: **complete — coordinated 36.4 exit audit passed 2026-09-06**
+
+The compiler's Stage 36 contract makes public file types recursively beneath
+`cloth.lang` available as a low-priority type-name fallback.
+Prelude lookup is a compiler concern over declarations already present in the
+canonical `cloth` input.
+
+Objective: preserve Stage 35 selection, injection, artifact, cache, and linker
+behavior while the compiler adds deterministic prelude lookup and the standard
+library later adds an explicitly approved `lang` API slice.
+
+Shuttle does not parse `cloth.lang`, enumerate public declarations, synthesize
+imports, or store a prelude list. The existing exact package version and digest
+continue to invalidate consumers. Updating the selected version during 36.3 is
+a distribution input change, not a new resolution policy.
+
+Deliverables:
+
+1. **36.1 — Prelude contract (complete).** Record compiler ownership and the
+   unchanged Shuttle boundary, compatibility, verification, and non-goals.
+2. **36.2 — Prelude resolution (complete).** Coordinate whole-project,
+   separate-package, source-free, target, cache, and diagnostic tests without a
+   Shuttle production change.
+3. **36.3 — Initial `lang` API slice (complete, amended).** Preserve recursive
+   `cloth.lang` identities and carry exact standard-library version `0.2.0` and
+   its digest through existing capability, metadata, artifact, invalidation,
+   and linking paths.
+4. **36.4 — Exit audit (complete).** Close all shared package,
+   native/cross-target, determinism, documentation, and repository quality
+   gates.
+
+Compatibility remains artifact/compiler/runtime 5/5/4 and process/receipt/
+manifest/toolchain schemas 2/1/1/1. Shuttle remains opaque to the
+`ArgumentError` and `StateError` declarations and performs no version solving.
+
+The coordinated exit audit passes all 36 compiler-backed toolchain cases, 32
+native cases, 49 ordinary Rust tests, Rust 1.85, warning-denied Clippy, both
+compiler configurations, editor checks, documentation, and repository gates.
+
 ## Stage 35: Standard library coordination
 
 Status: **complete — coordinated exit audit passed 2026-09-05**

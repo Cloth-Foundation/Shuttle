@@ -606,6 +606,12 @@ pub fn pair_compiler_with_standard_library(source_compiler: &Path, destination_c
     let relative_manifest = metadata["standard_library"]["manifest"]
         .as_str()
         .expect("standard library manifest selection");
+    let package = metadata["standard_library"]["package"]
+        .as_str()
+        .expect("standard library package selection");
+    let version = metadata["standard_library"]["version"]
+        .as_str()
+        .expect("standard library version selection");
     let source_manifest = fs::canonicalize(source_directory.join(relative_manifest))
         .expect("selected standard library manifest");
     let source_library = source_manifest
@@ -622,9 +628,19 @@ pub fn pair_compiler_with_standard_library(source_compiler: &Path, destination_c
         &source_library.join("src"),
         &destination_library.join("src"),
     );
+    let mut paired_metadata = serde_json::to_vec(&serde_json::json!({
+        "schema": 1,
+        "standard_library": {
+            "package": package,
+            "version": version,
+            "manifest": "standard-library/Shuttle.toml",
+        },
+    }))
+    .expect("serialize paired compiler metadata");
+    paired_metadata.push(b'\n');
     fs::write(
         destination_directory.join("cloth-toolchain.json"),
-        "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.1.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+        paired_metadata,
     )
     .expect("destination compiler toolchain metadata");
 }
