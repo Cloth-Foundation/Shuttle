@@ -55,6 +55,51 @@ Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
 
 Stage 37 coordination is complete following the 37.4 exit audit on 2026-09-06.
 
+Stage 38 coordination is complete following the 38.4 exit audit on 2026-09-06.
+
+## Stage 38: Portable text-input coordination
+
+Status: **complete — coordinated 38.4 exit audit passed 2026-09-06**
+
+The compiler's [Stage 38 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_38_text_input_and_parsing.md)
+adds `cloth.io::Console.ReadLine` and strict primitive meta parsing. Shuttle
+owns process standard-input inheritance and exact compiler-paired library
+selection; it does not read or interpret application input.
+
+Objective: preserve deterministic package construction, output publication,
+and process behavior while the compiler, runtime, and standard library add the
+portable text boundary.
+
+Deliverables:
+
+1. **38.1 — Contract (complete).** Record stdin ownership, unchanged build
+   inputs, the runtime/library transition, compatibility, verification, and
+   non-goals.
+2. **38.2 — Library/runtime coordination (complete).** Carry runtime ABI 6 and `cloth`
+   v0.3.0 through compiler identity, toolchain metadata, exact dependency
+   selection, artifacts, reuse, invalidation, linking, and low-level tests.
+3. **38.3 — Input and parsing integration (complete).** Prove inherited interactive and
+   redirected input, input-independent artifacts, primitive parsing, native and
+   source-free execution, both targets, streams, statuses, and failure
+   preservation without source parsing in Shuttle.
+4. **38.4 — Exit audit (complete).** Close native/cross-target,
+   compatibility, determinism, Rust/MSRV, documentation, formatting, sanitizer,
+   and repository gates.
+
+`shuttle run` inherits the child process's standard input. Shuttle does not
+decode, buffer, log, hash, or place it in compiler requests; `check` and `build`
+do not consume it. Existing `run --` arguments and application stream/status
+contracts remain unchanged.
+
+Checkpoint 38.2 moves compatibility to artifact/compiler/runtime 5/5/6 and
+`cloth` v0.3.0. Process/receipt/manifest/toolchain schemas remain 2/1/1/1;
+Shuttle continues to carry compiler-owned artifacts opaquely.
+
+The coordinated audit proves redirected standard-input inheritance, strict
+primitive parse success and failure, input-independent artifacts, exact reuse
+and invalidation, relocated serial/parallel determinism, source-free execution,
+and failure preservation without a Shuttle production or schema change.
+
 ## Stage 37: Portable program-argument coordination
 
 Status: **complete — coordinated 37.4 exit audit passed 2026-09-06**

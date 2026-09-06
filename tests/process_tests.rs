@@ -203,7 +203,7 @@ fn rejects_malformed_or_incompatible_toolchain_metadata() {
             "invalid JSON",
         ),
         (
-            "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.2.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
+            "{\"schema\":1,\"standard_library\":{\"package\":\"cloth\",\"version\":\"0.3.0\",\"manifest\":\"standard-library/Shuttle.toml\"}}\n",
             "does not match the selected compiler",
         ),
         (
@@ -254,7 +254,7 @@ fn rejects_invalid_standard_library_distributions() {
             "must define package 'cloth'",
         ),
         (
-            "manifest-version = 1\n[package]\nname = \"cloth\"\nversion = \"0.2.0\"\nsource-root = \"src\"\n",
+            "manifest-version = 1\n[package]\nname = \"cloth\"\nversion = \"0.3.0\"\nsource-root = \"src\"\n",
             "does not match compiler version",
         ),
         (

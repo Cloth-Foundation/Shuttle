@@ -41,8 +41,45 @@ Stage 35 coordination is complete following the separately authorized 35.4
 exit audit on 2026-09-05.
 Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
 Stage 37 coordination is complete following the 37.4 exit audit on 2026-09-06.
+Stage 38 coordination is complete following the 38.4 exit audit on 2026-09-06.
 
 ## Scheduled work
+
+### Stage 38: Portable text-input coordination
+
+- [x] Record standard-input ownership, input-independent compiler and cache
+  behavior, the trusted compiler/library boundary, runtime and library version
+  transitions, compatibility, verification, and non-goals.
+
+  Completed with compiler 38.1 on 2026-09-06. Shuttle inherits stdin only for
+  the launched application and never reads, decodes, buffers, logs, hashes, or
+  sends it through the compiler protocol. This checkpoint changes documentation
+  only; compatibility remains 5/5/5 and 2/1/1/1 with `cloth` v0.2.0.
+- [x] During 38.2, carry runtime ABI 6 and `cloth` v0.3.0 through the existing
+  capability, toolchain-metadata, package selection, artifact, cache,
+  invalidation, receipt, and link boundaries without a schema change.
+
+  Completed 2026-09-06. Exact v0.3.0 library selection and runtime-ABI-6
+  artifacts pass compiler-backed capability, metadata, source-free, link, and
+  native tests without a Shuttle production or schema change.
+- [x] During 38.3, verify interactive and redirected stdin inheritance, strict
+  input and parsing behavior, input-independent artifacts, direct/Shuttle and
+  whole/separate/source-free equivalence, both targets, streams, statuses,
+  failure preservation, and stale-run prevention.
+
+  Completed 2026-09-06. Compiler-backed native coverage proves redirected stdin
+  inheritance, strict success and `ParseError` failure behavior, unchanged
+  artifacts, exact reuse on a second run, and source-free paired-library
+  execution. Shuttle production code and schemas remain unchanged.
+- [x] Complete the coordinated 38.4 development, sanitizer, native,
+  cross-target, Rust/MSRV, editor, documentation, formatting, and repository
+  gates.
+
+  Completed 2026-09-06. Input-independent artifacts, exact paired-library
+  invalidation and reuse, relocated serial/parallel determinism, source-free
+  parsing, failed-output preservation, native and both-target behavior, and all
+  Rust/MSRV, editor, documentation, formatting, sanitizer, and repository gates
+  pass without a Shuttle production or schema change.
 
 ### Stage 37: Portable program-argument coordination
 
