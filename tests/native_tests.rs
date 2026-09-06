@@ -42,6 +42,10 @@ struct ArtifactReceipt {
 }
 
 fn whole_project_run(fixture: &Fixture) -> Output {
+    whole_project_run_with_arguments(fixture, &[])
+}
+
+fn whole_project_run_with_arguments(fixture: &Fixture, program_arguments: &[OsString]) -> Output {
     let graph = resolve_package_graph(&fixture.manifest()).expect("fixture graph");
     let request = build_request(&graph, ProjectCommand::Build, Target::X86_64)
         .expect("whole-project request");
@@ -55,7 +59,84 @@ fn whole_project_run(fixture: &Fixture) -> Output {
         .args(request.arguments()));
     expect_status(&compiled, 0);
     assert!(compiled.stdout.is_empty() && compiled.stderr.is_empty());
-    run(&mut Command::new(output))
+    run(Command::new(output).args(program_arguments))
+}
+
+#[cfg(unix)]
+fn invalid_unicode_argument() -> OsString {
+    use std::os::unix::ffi::OsStringExt;
+
+    OsString::from_vec(vec![0xff])
+}
+
+#[cfg(windows)]
+fn invalid_unicode_argument() -> OsString {
+    use std::os::windows::ffi::OsStringExt;
+
+    OsString::from_wide(&[0xd800])
+}
+
+fn verify_program_argument_failure_preservation(
+    fixture: &Fixture,
+    selected: &Path,
+    executable: &Path,
+) {
+    let artifact_bytes = fixture.artifact_bytes("app/target/x86_64/packages");
+    let executable_bytes = fs::read(executable).expect("program executable");
+    fixture.write(
+        "app/src/Main.co",
+        "static func Main(string[] arguments) { missing(arguments); }\n",
+    );
+    let mut failed = fixture.shuttle("run", selected);
+    failed.arg("--").arg("must-not-run");
+    let failed = run(&mut failed);
+    assert!(!failed.status.success());
+    assert!(failed.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("unknown name 'missing'"));
+    assert_eq!(
+        fixture.artifact_bytes("app/target/x86_64/packages"),
+        artifact_bytes
+    );
+    assert_eq!(
+        fs::read(executable).expect("preserved program executable"),
+        executable_bytes
+    );
+    let preserved = run(Command::new(executable).arg("preserved"));
+    expect_status(&preserved, 1);
+    assert_eq!(preserved.stdout, b"1\n9\npreserved\n");
+    assert!(preserved.stderr.is_empty());
+}
+
+fn verify_throwing_program_argument_entry(selected: &Path) {
+    let fixture = Fixture::new();
+    fixture.write(
+        "app/src/Failure.co",
+        r"
+error {
+  Failure(string message): Error(message) {}
+}
+",
+    );
+    fixture.write(
+        "app/src/Main.co",
+        r"
+import Failure;
+static func Main(string[] arguments) throws Failure {
+  throw Failure(arguments[0]);
+}
+",
+    );
+    let mut command = fixture.shuttle("run", selected);
+    command.arg("--").arg("boom");
+    let output = run(&mut command);
+    expect_status(&output, 1);
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stderr)
+            .expect("typed error output")
+            .replace("\r\n", "\n"),
+        "cloth error: app.Failure: boom\n"
+    );
 }
 
 #[test]
@@ -1264,6 +1345,92 @@ fn builds_and_runs_only_the_selected_root_entry() {
         "41\n"
     );
     assert!(output.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+#[cfg(any(unix, windows))]
+fn shuttle_run_preserves_managed_program_arguments() {
+    const SOURCE: &str = r"
+static func Main(string[] arguments): int32 {
+  println(arguments::length);
+  for (string argument in arguments) {
+    println(argument::length);
+    println(argument);
+  }
+  return arguments::length;
+}
+";
+    let fixture = Fixture::new();
+    fixture.write("app/src/Main.co", SOURCE);
+    let selected = compiler();
+    let arguments = ["first", "two words", "", " ", "--quiet", "é🙂"].map(OsString::from);
+    let expected = "6\n5\nfirst\n9\ntwo words\n0\n\n1\n \n7\n--quiet\n2\né🙂\n";
+
+    let mut shuttle = fixture.shuttle("run", &selected);
+    shuttle.arg("--").args(&arguments);
+    let forwarded = run(&mut shuttle);
+    expect_status(&forwarded, 6);
+    assert_eq!(
+        String::from_utf8(forwarded.stdout.clone()).expect("program output"),
+        expected
+    );
+    assert!(forwarded.stderr.is_empty());
+
+    let executable = fixture
+        .root
+        .join("app/target/x86_64")
+        .join(format!("app{}", std::env::consts::EXE_SUFFIX));
+    let artifact_bytes = fixture.artifact_bytes("app/target/x86_64/packages");
+    let executable_bytes = fs::read(&executable).expect("program executable");
+    let direct = run(Command::new(&executable).args(&arguments));
+    expect_status(&direct, 6);
+    assert_eq!(direct.stdout, forwarded.stdout);
+    assert_eq!(direct.stderr, forwarded.stderr);
+
+    let whole = Fixture::new();
+    whole.write("app/src/Main.co", SOURCE);
+    let whole_output = whole_project_run_with_arguments(&whole, &arguments);
+    expect_status(&whole_output, 6);
+    assert_eq!(whole_output.stdout, forwarded.stdout);
+    assert_eq!(whole_output.stderr, forwarded.stderr);
+
+    let mut changed = fixture.visible_shuttle("run", &selected);
+    changed.arg("--").arg("changed");
+    let changed = run(&mut changed);
+    expect_status(&changed, 1);
+    assert_eq!(changed.stdout, b"1\n7\nchanged\n");
+    let progress = String::from_utf8(changed.stderr).expect("reuse progress");
+    assert_eq!(progress.matches("shuttle: reusing ").count(), 5);
+    assert!(!progress.contains("shuttle: compiling "));
+    assert_eq!(
+        fixture.artifact_bytes("app/target/x86_64/packages"),
+        artifact_bytes
+    );
+    assert_eq!(
+        fs::read(&executable).expect("reused program executable"),
+        executable_bytes
+    );
+
+    let mut empty = fixture.shuttle("run", &selected);
+    empty.arg("--");
+    let empty = run(&mut empty);
+    expect_status(&empty, 0);
+    assert_eq!(empty.stdout, b"0\n");
+    assert!(empty.stderr.is_empty());
+
+    let mut invalid = fixture.shuttle("run", &selected);
+    invalid.arg("--").arg(invalid_unicode_argument());
+    let invalid = run(&mut invalid);
+    assert!(!invalid.status.success());
+    assert!(invalid.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&invalid.stderr)
+            .contains("cloth runtime error: program argument is not valid Unicode")
+    );
+
+    verify_program_argument_failure_preservation(&fixture, &selected, &executable);
+    verify_throwing_program_argument_entry(&selected);
 }
 
 #[test]

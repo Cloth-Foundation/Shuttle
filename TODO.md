@@ -40,8 +40,46 @@ complete following the compiler's 34.4 exit audit on 2026-09-05.
 Stage 35 coordination is complete following the separately authorized 35.4
 exit audit on 2026-09-05.
 Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
+Stage 37 coordination is complete following the 37.4 exit audit on 2026-09-06.
 
 ## Scheduled work
+
+### Stage 37: Portable program-argument coordination
+
+- [x] Record the approved `shuttle run -- [ARGUMENT]...` boundary, host-native
+  forwarding, compiler/runtime ownership, compatibility, diagnostics,
+  verification, and non-goals.
+
+  Completed with compiler 37.1 on 2026-09-06. Only `run` may receive values,
+  and only after an explicit `--`. Shuttle must preserve argument boundaries and
+  host-native values without decoding or command reconstruction. This checkpoint
+  changes documentation only.
+- [x] During compiler/runtime 37.2, keep Shuttle production behavior unchanged
+  while coordinated fixtures establish the new `Main(string[] args)` and runtime
+  ABI 5 boundary.
+
+  Completed with compiler 37.2 on 2026-09-06. Direct and source-free entry
+  adapters, strict Unicode conversion, managed ownership, GC rooting, malformed
+  host-state failures, and zero-argument compatibility pass with development and
+  sanitizer compilers. Shuttle production code and schemas remain unchanged.
+- [x] During 37.3, implement exact trailing-argument forwarding and cover zero,
+  empty, whitespace, option-like, Unicode, status, stream, failure, and reuse
+  behavior.
+
+  Completed 2026-09-06. The CLI accepts an `OsString` vector only after the
+  `run --` delimiter and passes it directly to the completed executable. Values
+  do not enter compiler requests or cache keys. Process-contract and native
+  tests cover exact forwarding, zero arguments, warm reuse, status and stream
+  behavior, malformed Unicode, and whole/source-free equivalence.
+- [x] Complete the coordinated 37.4 development, sanitizer, native,
+  cross-target, Rust, editor, documentation, formatting, and repository gates.
+
+  Completed 2026-09-06. Both 269-test compiler configurations pass all 36
+  compiler-backed toolchain cases and 33 native cases. Exact forwarding,
+  statuses, typed errors, invalid Unicode, artifact identity, failure
+  preservation, and stale-run prevention pass with Rust 1.85, warning-denied
+  Clippy, editor, documentation, formatting, and repository gates.
+  **Stage 37 is complete.**
 
 ### Stage 36: Standard-library prelude coordination
 

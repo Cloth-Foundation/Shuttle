@@ -473,6 +473,7 @@ pub fn execute_graph(
     target: Target,
     progress_mode: ProgressMode,
     jobs: usize,
+    program_arguments: &[OsString],
 ) -> Result<(), ProcessFailure> {
     if jobs == 0 {
         return Err(process_error(
@@ -482,6 +483,11 @@ pub fn execute_graph(
     if command != ProjectCommand::Check && target != Target::X86_64 {
         return Err(process_error(
             "native executable output currently supports only target 'x86_64'".to_owned(),
+        ));
+    }
+    if command != ProjectCommand::Run && !program_arguments.is_empty() {
+        return Err(process_error(
+            "only the run command accepts program arguments".to_owned(),
         ));
     }
     let capabilities = query_capabilities(compiler)?;
@@ -527,7 +533,7 @@ pub fn execute_graph(
     if command == ProjectCommand::Run {
         let output = executable_output(&graph, target)?;
         progress.running(&output);
-        run_executable(&output)?;
+        run_executable(&output, program_arguments)?;
     }
     Ok(())
 }
@@ -1158,8 +1164,9 @@ fn link_executable(
     Ok(())
 }
 
-fn run_executable(output: &Path) -> Result<(), ProcessFailure> {
+fn run_executable(output: &Path, program_arguments: &[OsString]) -> Result<(), ProcessFailure> {
     let status = Command::new(output)
+        .args(program_arguments)
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())

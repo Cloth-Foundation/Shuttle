@@ -1,5 +1,71 @@
 # Shuttle verification
 
+## Stage 37.4 portable program-argument exit audit
+
+Completed with the compiler audit on Windows on 2026-09-06. Development and
+ASan/UBSan configurations each pass all 269 compiler CTests, including all 36
+compiler-backed Shuttle toolchain cases and 33 native cases. All 51 ordinary
+Rust tests, a Rust 1.85 all-target check, warning-denied Clippy, Rust and C++
+formatting, both 12-test editor runs, documentation links, and repository gates
+pass.
+
+The final Shuttle matrix preserves exact application values, streams, statuses,
+typed errors, and strict invalid-host-text failure. Arguments remain outside
+compiler requests and artifact identity: changed values completely reuse the
+package graph and executable. A failed argument-taking rebuild preserves every
+completed artifact and executable without launching stale output. Direct,
+whole-project, separate-package, source-free, and `shuttle run --` execution
+agree.
+
+Compatibility remains artifact/compiler/runtime 5/5/5 and process/receipt/
+manifest/toolchain-metadata 2/1/1/1. **Stage 37 is complete.**
+
+## Stage 37.3 exact program-argument forwarding
+
+Completed on Windows on 2026-09-06. Development and ASan/UBSan configurations
+each pass all 263 compiler CTests, including all 36 compiler-backed Shuttle
+toolchain cases and 33 native cases. All 51 ordinary Rust tests pass with Rust
+1.89 while preserving the Rust 1.85 MSRV. Warning-denied Clippy and Rust
+formatting pass.
+
+CLI and child-process tests require the explicit `run --` boundary and reject
+program values for `check`, `build`, or undelimited `run`. Native tests preserve
+zero, empty, whitespace-only, option-looking, and Unicode values; statuses and
+streams; warm reuse with changed arguments; malformed host Unicode; and direct,
+whole-project, separate-package, and source-free equivalence. Program arguments
+remain outside compiler requests, artifact identity, and cache keys.
+
+Compatibility remains artifact/compiler/runtime 5/5/5 and process/receipt/
+manifest/toolchain-metadata 2/1/1/1. Stage 37.4 is the remaining exit audit.
+
+## Stage 37.2 compiler and runtime coordination
+
+Completed with compiler checkpoint 37.2 on Windows on 2026-09-06. Development
+and ASan/UBSan configurations each pass all 263 compiler CTests, including the
+compiler-backed Shuttle toolchain and native suites. Direct and source-free
+artifact executables accept the new managed `string[]` entry parameter while
+the existing zero-parameter entry path remains valid.
+
+The compiler/runtime boundary now uses artifact/compiler/runtime compatibility
+5/5/5. Shuttle production code, process protocol 2, receipt schema 1, manifest
+schema 1, toolchain-metadata schema 1, and cache semantics remain unchanged.
+Exact `shuttle run --` forwarding remains the separately authorized 37.3 work.
+
+## Stage 37.1 portable program-argument contract
+
+Approved with compiler checkpoint 37.1 on Windows on 2026-09-06. The contract
+reserves `shuttle run -- [ARGUMENT]...` for exact host-native forwarding. Only
+`run` accepts application values; Shuttle does not decode, parse, normalize,
+join, or reconstruct them. Compiler and runtime code own conversion into a
+managed `string[]` and strict invalid-Unicode handling.
+
+This checkpoint changes coordinated roadmap, ledger, proposal, and verification
+documentation only. Shuttle production behavior, tests, package version,
+artifact/compiler/runtime compatibility 5/5/4, and process/receipt/manifest/
+toolchain schemas 2/1/1/1 remain unchanged. Runtime ABI 5 and compiler behavior
+wait for a separately authorized 37.2 checkpoint. Documentation links and
+repository whitespace gates pass.
+
 ## Stage 36.4 standard-library prelude exit audit
 
 Completed with both compiler configurations on Windows on 2026-09-06. Each

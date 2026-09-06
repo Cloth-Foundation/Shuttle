@@ -225,17 +225,17 @@ All project-significant paths must be representable as Unicode and must not
 contain control characters. This keeps manifests, diagnostics, and build logs
 portable across supported hosts.
 
-## Commands covered by Stage 22
+## Commands
 
 Manifest version 1 supports these project commands:
 
 - `shuttle check` validates and type-checks the package graph without emitting
   a program;
 - `shuttle build` builds the root package's executable; and
-- `shuttle run` builds and runs that executable without source-visible command
-  arguments.
+- `shuttle run` builds and runs that executable, optionally forwarding values
+  after an explicit `--` delimiter.
 
-All accept `--manifest-path`, `--compiler`, and `--target`. The Stage 22 target
+All accept `--manifest-path`, `--compiler`, and `--target`. The current target
 names are `x86_64` and `wasm32`; executable emission remains limited to the
 compiler's supported native target. `build` and `run` require `[executable]`.
 
@@ -243,12 +243,14 @@ compiler's supported native target. `build` and `run` require `[executable]`.
 `clothc` found on `PATH`. Shuttle verifies protocol compatibility before every
 compiler invocation. Native output is written to
 `target/x86_64/EXECUTABLE_NAME` beneath the root package, with the platform
-executable suffix where required. `run` executes that completed output without
-passing source-visible arguments.
+executable suffix where required. `run` executes that completed output directly.
+For example, `shuttle run -- first "two words" ""` forwards three application
+arguments. `check` and `build` reject program arguments, and values before the
+delimiter remain Shuttle options.
 
-Stage 22 does not provide `new`, `init`, `test`, `clean`, workspaces, profiles,
-features, publishing, or program-argument delivery. Those commands and concepts
-require later scheduled contracts.
+Shuttle does not yet provide `new`, `init`, `test`, `clean`, workspaces,
+profiles, features, or publishing. Those commands and concepts require later
+scheduled contracts.
 
 ## Diagnostics
 

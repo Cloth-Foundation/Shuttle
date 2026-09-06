@@ -65,8 +65,12 @@ For a local Cloth project and compiler checkout:
 cargo run --locked -- check --manifest-path ../examples/Shuttle.toml \
   --compiler ../build/dev/clothc
 cargo run --locked -- run --manifest-path ../examples/Shuttle.toml \
-  --compiler ../build/dev/clothc --jobs 4
+  --compiler ../build/dev/clothc --jobs 4 -- first "two words"
 ```
+
+Only `run` accepts application arguments, and only after the explicit `--`
+delimiter. Shuttle forwards each host-native value directly to the completed
+program.
 
 `check` keeps validated interface artifacts under
 `target/TARGET/check/packages/`. `build` and `run` keep object artifacts under
@@ -83,7 +87,9 @@ artifacts are reused only after compiler-owned validation, and independent ready
 packages run under a bounded deterministic scheduler. The standard library
 paired with the chosen compiler is injected automatically as `cloth`; user
 manifests cannot select or replace it. Remote dependencies and registries are
-not implemented.
+not implemented. `shuttle run -- [ARGUMENT]...` forwards host-native application
+arguments directly to the completed executable; the compiler runtime owns their
+managed `string[]` conversion.
 
 [`ROADMAP.md`](ROADMAP.md) owns Shuttle's stage order and scope.
 [`TODO.md`](TODO.md) owns the concrete scheduled work and deferred backlog.

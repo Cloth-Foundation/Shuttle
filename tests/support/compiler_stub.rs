@@ -17,10 +17,8 @@ fn main() {
     let operation = option(&arguments, "--operation");
     let phase = if query {
         "query"
-    } else if arguments.is_empty() {
-        "run"
     } else {
-        operation.as_deref().expect("operation")
+        operation.as_deref().unwrap_or("run")
     };
     let log_path = PathBuf::from(env::var_os("SHUTTLE_STUB_LOG").expect("stub log"));
     let mut log = OpenOptions::new()
@@ -65,7 +63,14 @@ fn main() {
         return;
     }
     if phase == "run" {
-        println!("program");
+        if mode == "run-arguments" {
+            println!("{}", arguments.len());
+            for argument in &arguments {
+                println!("<{}>", argument.to_string_lossy());
+            }
+        } else {
+            println!("program");
+        }
         eprintln!("program stderr");
         std::process::exit(7);
     }
