@@ -20,6 +20,19 @@ shuttle: finished build for x86_64 in 842ms
 then reports the executable path before transferring its standard input,
 standard output, standard error, and exit status directly to the program.
 
+Application arguments follow one explicit delimiter:
+
+```sh
+shuttle run -- first "two words" "" --flag
+```
+
+Only `run` accepts these values. Shuttle options remain before `--`; every
+value after it belongs to the program, including empty, whitespace-only, and
+option-looking values. `shuttle run --` supplies zero application arguments.
+Shuttle forwards the host-native argument vector directly without decoding,
+joining, normalizing, or adding the executable name. Program arguments do not
+affect compiler requests, artifacts, or cache keys.
+
 Progress is emitted before each potentially long compiler or linker operation.
 Elapsed time and the effective job count are informational and are not
 deterministic build inputs or a machine-readable protocol. Package order follows

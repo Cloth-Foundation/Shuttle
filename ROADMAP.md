@@ -53,6 +53,41 @@ exit audit on 2026-09-05.
 
 Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
 
+Stage 37 coordination is complete following the 37.4 exit audit on 2026-09-06.
+
+## Stage 37: Portable program-argument coordination
+
+Status: **complete — coordinated 37.4 exit audit passed 2026-09-06**
+
+The compiler's [Stage 37 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_37_program_arguments.md)
+allows an executable `Main` to receive a managed `string[]`. Shuttle owns only
+the explicit host process boundary after `run --`; it does not decode, parse,
+normalize, join, or otherwise interpret application arguments.
+
+Deliverables:
+
+1. **37.1 — Contract (complete).** Record the `run --` syntax, host-native value
+   preservation, compiler/runtime ownership, diagnostics, compatibility,
+   verification, and non-goals.
+2. **37.2 — Compiler and runtime coordination (complete).** Keep Shuttle
+   production code unchanged while compiler fixtures establish runtime ABI 5
+   and entry behavior.
+3. **37.3 — Forwarding implementation (complete).** Accept arguments only
+   after `run --`, forward them exactly once, and verify streams, statuses, and
+   package reuse.
+4. **37.4 — Exit audit (complete).** Close direct/Shuttle equivalence,
+   encoding failures, native execution, failure preservation, Rust,
+   documentation, and repository gates.
+
+Current compatibility is artifact/compiler/runtime 5/5/5 and process/receipt/
+manifest/toolchain schemas 2/1/1/1. Checkpoint 37.3 changes only the `run`
+process boundary; it changes no manifest, protocol, receipt, artifact format,
+cache, or standard-library contract.
+
+The coordinated 37.4 matrix passes both 269-test compiler configurations, all
+36 compiler-backed toolchain cases, all 33 native cases, Rust/MSRV, editor,
+documentation, formatting, and repository gates. **Stage 37 is complete.**
+
 ## Stage 36: Standard-library prelude coordination
 
 Status: **complete — coordinated 36.4 exit audit passed 2026-09-06**

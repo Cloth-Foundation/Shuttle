@@ -141,3 +141,30 @@ fn package_job_limit_is_positive_and_documented() {
     let stderr = String::from_utf8(output.stderr).expect("UTF-8 standard error");
     assert!(stderr.contains("invalid value '0'"));
 }
+
+#[test]
+fn program_arguments_require_the_run_delimiter() {
+    let project = TempDir::new().expect("create temporary directory");
+    let help = shuttle(project.path(), &["run", "--help"]);
+    assert!(help.status.success());
+    assert!(
+        String::from_utf8(help.stdout)
+            .expect("UTF-8 help")
+            .contains("[-- <ARGUMENT>...]")
+    );
+
+    for arguments in [
+        &["run", "value"][..],
+        &["check", "--", "value"][..],
+        &["build", "--", "value"][..],
+    ] {
+        let output = shuttle(project.path(), arguments);
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+        assert!(
+            String::from_utf8(output.stderr)
+                .expect("UTF-8 diagnostic")
+                .contains("unexpected argument")
+        );
+    }
+}

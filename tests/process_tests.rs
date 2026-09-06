@@ -381,6 +381,31 @@ fn runs_only_after_success_and_forwards_program_streams_and_status() {
 }
 
 #[test]
+fn forwards_program_arguments_after_the_explicit_boundary() {
+    let fixture = Fixture::new();
+    let compiler = stub(&fixture);
+    let mut command = command(&fixture, &compiler, "run", "run-arguments");
+    command
+        .arg("--")
+        .args(["", "two words", " ", "--quiet", "é🙂"]);
+    let output = run(&mut command);
+    expect_status(&output, 7);
+    assert_eq!(
+        String::from_utf8(output.stdout)
+            .expect("program stdout")
+            .replace("\r\n", "\n"),
+        "5\n<>\n<two words>\n< >\n<--quiet>\n<é🙂>\n"
+    );
+    assert_eq!(
+        String::from_utf8(output.stderr)
+            .expect("program stderr")
+            .replace("\r\n", "\n"),
+        "program stderr\n"
+    );
+    assert_eq!(phases(&fixture).last().map(String::as_str), Some("run"));
+}
+
+#[test]
 fn reports_build_progress_without_contaminating_program_output() {
     let fixture = Fixture::new();
     let compiler = stub(&fixture);

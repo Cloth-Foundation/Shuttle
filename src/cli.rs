@@ -2,6 +2,7 @@
 // Exceptions. See LICENSE.txt in the project root for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+use std::ffi::OsString;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 
@@ -33,7 +34,7 @@ enum Command {
     /// Build the root package executable.
     Build(ProjectOptions),
     /// Build and run the root package executable.
-    Run(ProjectOptions),
+    Run(RunOptions),
 }
 
 #[derive(Debug, Args)]
@@ -59,6 +60,16 @@ struct ProjectOptions {
     jobs: Option<NonZeroUsize>,
 }
 
+#[derive(Debug, Args)]
+struct RunOptions {
+    #[command(flatten)]
+    project: ProjectOptions,
+
+    /// Pass these arguments unchanged to the Cloth program.
+    #[arg(last = true, value_name = "ARGUMENT")]
+    arguments: Vec<OsString>,
+}
+
 #[derive(Debug)]
 pub struct CommandFailure {
     pub exit_code: u8,
@@ -72,10 +83,10 @@ pub struct CommandFailure {
 /// Returns project diagnostics when discovery, graph validation, compiler
 /// selection, protocol negotiation, compilation, or program execution fails.
 pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure> {
-    let (project_command, options) = match cli.command {
-        Command::Check(options) => (ProjectCommand::Check, options),
-        Command::Build(options) => (ProjectCommand::Build, options),
-        Command::Run(options) => (ProjectCommand::Run, options),
+    let (project_command, options, program_arguments) = match cli.command {
+        Command::Check(options) => (ProjectCommand::Check, options, Vec::new()),
+        Command::Build(options) => (ProjectCommand::Build, options, Vec::new()),
+        Command::Run(options) => (ProjectCommand::Run, options.project, options.arguments),
     };
 
     let manifest_path = resolve_manifest_path(options.manifest_path.as_deref(), current_directory)
@@ -118,6 +129,7 @@ pub fn execute(cli: Cli, current_directory: &Path) -> Result<(), CommandFailure>
         options.target,
         progress,
         jobs,
+        &program_arguments,
     )
     .map_err(|failure| CommandFailure {
         exit_code: failure.exit_code,
