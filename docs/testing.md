@@ -1,5 +1,75 @@
 # Shuttle verification
 
+## Stage 36.4 standard-library prelude exit audit
+
+Completed with both compiler configurations on Windows on 2026-09-06. Each
+255-test CTest matrix passes all 36 compiler-backed toolchain cases and 32
+native cases. All 49 ordinary Rust tests, Rust 1.85, warning-denied Clippy,
+formatting, both 12-test editor runs, documentation links, and repository gates
+also pass.
+
+The coordinated matrix verifies source-free recursive prelude lookup, standard-
+library bootstrap without a self-dependency, x86-64 and wasm32 artifacts,
+relocated one-job/four-job determinism, native linking and execution, exact
+invalidation, warm reuse, failed-output preservation, and stale-run prevention.
+Shuttle remains opaque to `cloth.lang` declarations. Compatibility remains
+artifact/compiler/runtime 5/5/4 and process/receipt/manifest/toolchain schemas
+2/1/1/1. **Stage 36 coordination is complete.**
+
+## Stage 36.3 initial standard-library API
+
+Completed with compiler checkpoint 36.3 on Windows on 2026-09-05 and amended
+2026-09-06 for the recursive prelude. The paired distribution remains `cloth`
+v0.2.0. Existing strict metadata selection,
+capability validation, artifact dependency records, cache inputs,
+invalidation, and link closure carry that exact version and digest without a
+schema or version-solving change.
+
+A manifest without a standard-library dependency uses unqualified
+`ArgumentError` and `StateError` with canonical `cloth.lang.errors` identities
+from source-free `cloth` artifacts on x86-64 and wasm32. A nested synthetic
+prelude package proves recursive lookup and deterministic artifacts. The native
+path links independent package artifacts, prints both messages, and completely
+reuses both artifacts on a warm run. Exact library source edits still
+invalidate the library and consumer on both targets.
+
+All 36 compiler-backed toolchain cases, 32 native cases, and 49 ordinary Rust
+tests pass, together with Rust formatting, warning-denied Clippy, documentation
+targets, and repository checks. Shuttle remains unaware of library
+declarations. Compatibility stays 5/5/4 and 2/1/1/1. The completed coordinated
+Stage 36.4 audit is recorded above.
+
+## Stage 36.2 standard-library prelude resolution
+
+Completed with compiler checkpoint 36.2 on Windows on 2026-09-05. The public
+toolchain suite copies the selected compiler and paired standard-library
+distribution, adds a synthetic public type directly beneath `src/lang/`, and
+checks an application that uses the type without an import. The library builds
+without a self-dependency and the consumer receives only its verified package
+artifact.
+
+The fixture passes on x86-64 and wasm32 with one and four jobs; both the
+`cloth.cpa` and consumer artifacts are byte-identical across relocated
+fixtures. All 36 compiler-backed toolchain cases and 49 ordinary Rust tests
+pass, along with warning-denied Clippy and Rust formatting. No Shuttle
+production path, manifest or receipt schema, protocol, package version, or
+production standard-library source changed.
+
+## Stage 36.1 standard-library prelude contract
+
+Approved and recorded on Windows on 2026-09-05. The compiler owns the
+nonrecursive `cloth.lang` fallback and derives it only from verified whole-
+project or imported declarations. Shuttle retains its Stage 35 responsibility
+for selecting and injecting one exact `cloth` package and remains unaware of
+the library's namespaces and APIs.
+
+This checkpoint changes coordinated roadmap, ledger, and contract documentation
+only. Artifact/compiler/runtime compatibility remains 5/5/4 and process/
+receipt/manifest/toolchain schemas remain 2/1/1/1. It adds no Shuttle
+production behavior, public library declaration, package-version change, or
+user-facing language claim. Documentation and repository gates passed. The
+separately authorized compiler checkpoint 36.2 is recorded above.
+
 ## Stage 35.4 standard-library foundation exit audit
 
 Verified on Windows on 2026-09-05 with development and ASan/UBSan compilers.

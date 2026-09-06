@@ -9,7 +9,7 @@ The default local command sequence is:
 ```text
 shuttle: preparing build for x86_64 (3 packages)
 shuttle: scheduling with 3 jobs
-shuttle: compiling cloth v0.1.0 [1/3]
+shuttle: compiling cloth v0.2.0 [1/3]
 shuttle: compiling foundation v1.0.0 [2/3]
 shuttle: compiling app v1.0.0 [3/3]
 shuttle: linking app

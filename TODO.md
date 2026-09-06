@@ -39,8 +39,48 @@ production or compatibility change was required. Stage 34 coordination is
 complete following the compiler's 34.4 exit audit on 2026-09-05.
 Stage 35 coordination is complete following the separately authorized 35.4
 exit audit on 2026-09-05.
+Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
 
 ## Scheduled work
+
+### Stage 36: Standard-library prelude coordination
+
+- [x] Record compiler ownership of `cloth.lang` eligibility and lookup while
+  retaining Shuttle ownership of exact library selection, injection, build
+  inputs, cache behavior, and toolchain diagnostics.
+
+  Approved with compiler 36.1 on 2026-09-05. This checkpoint changes
+  documentation only. Shuttle does not parse library declarations or maintain
+  a prelude list, and every active compatibility/schema version remains
+  unchanged.
+- [x] During 36.2, keep production behavior unchanged while shared fixtures
+  verify whole-project, separate-package, source-free, both-target, diagnostic,
+  reuse, and deterministic artifact behavior.
+
+  Completed with compiler 36.2 on 2026-09-05. A public process fixture copies
+  the paired distribution, adds a synthetic `cloth.lang` type, and verifies
+  source-free consumer artifacts on x86-64 and wasm32 with one and four jobs.
+  Artifact bytes match and no Shuttle production path changed.
+- [x] During 36.3, carry the separately approved library version and exact
+  digest through existing capability, metadata, invalidation, receipt, and link
+  paths without adding independent version solving.
+
+  Completed with compiler 36.3 on 2026-09-05 and amended 2026-09-06. The paired
+  distribution remains `cloth` v0.2.0 while the public errors move to recursive
+  `cloth.lang.errors` identities. Existing metadata selection, capability
+  validation, dependency receipts, cache keys, invalidation, and link closure
+  carry the exact package identity; Shuttle does not interpret prelude layout.
+- [x] Complete the coordinated 36.4 compiler, runtime, Shuttle, standard-
+  library, editor, documentation, formatting, link, sanitizer, and repository
+  exit gates.
+
+  Completed 2026-09-06. Both 255-test compiler configurations pass, including
+  all 36 compiler-backed toolchain cases and 32 native cases. All 49 ordinary
+  Rust tests, Rust 1.85, warning-denied Clippy, formatting, editor,
+  documentation, and repository gates pass. Shuttle production behavior and
+  compatibility schemas remain unchanged.
+
+  **Stage 36 coordination is complete.**
 
 ### Stage 35: Standard library coordination
 
