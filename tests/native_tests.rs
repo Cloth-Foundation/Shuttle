@@ -1443,12 +1443,12 @@ fn links_and_reuses_the_implicit_standard_library() {
     );
     fixture.write(
         "app/src/Main.co",
-        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero, ParseError { println(Math.Gcd(84, 30)); println(int32::parse(\"38\")); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let selected = compiler();
     let first = run(&mut fixture.shuttle("run", &selected));
     expect_status(&first, 0);
-    assert_eq!(first.stdout, b"6\ninvalid argument\ninvalid state\n");
+    assert_eq!(first.stdout, b"6\n38\ninvalid argument\ninvalid state\n");
     assert!(first.stderr.is_empty());
     for package in ["cloth", "app"] {
         assert!(
@@ -1461,7 +1461,7 @@ fn links_and_reuses_the_implicit_standard_library() {
 
     let second = run(&mut fixture.visible_shuttle("run", &selected));
     expect_status(&second, 0);
-    assert_eq!(second.stdout, b"6\ninvalid argument\ninvalid state\n");
+    assert_eq!(second.stdout, b"6\n38\ninvalid argument\ninvalid state\n");
     let progress = String::from_utf8(second.stderr).expect("reuse progress");
     assert_eq!(progress.matches("shuttle: reusing ").count(), 2);
     assert!(!progress.contains("shuttle: compiling "));
@@ -1473,10 +1473,10 @@ fn links_and_reuses_the_implicit_standard_library() {
     );
     whole.write(
         "app/src/Main.co",
-        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero, ParseError { println(Math.Gcd(84, 30)); println(int32::parse(\"38\")); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let graph = resolve_package_graph(&whole.manifest()).expect("whole-project graph");
-    let graph = inject_standard_library(&graph, &selected, "cloth", "0.2.0")
+    let graph = inject_standard_library(&graph, &selected, "cloth", "0.3.0")
         .expect("whole-project standard library");
     let request = build_request(&graph, ProjectCommand::Build, Target::X86_64)
         .expect("whole-project request");
@@ -1498,6 +1498,63 @@ fn links_and_reuses_the_implicit_standard_library() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn primitive_parsing_inherits_stdin_without_changing_artifacts() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "app/src/Main.co",
+        r#"
+import cloth.io::Console;
+static func Main() throws IoError, ParseError {
+  string text = Console.ReadLine() ?? throw IoError("missing input");
+  println(int32::parse(text));
+}
+"#,
+    );
+    fixture.write("first.input", "42\n");
+    fixture.write("second.input", "84\n");
+    fixture.write("invalid.input", "not-a-number\n");
+    let selected = compiler();
+
+    let mut first = fixture.shuttle("run", &selected);
+    first.stdin(fs::File::open(fixture.root.join("first.input")).expect("first input"));
+    let first = run(&mut first);
+    expect_status(&first, 0);
+    assert_eq!(first.stdout, b"42\n");
+    assert!(first.stderr.is_empty());
+    let artifacts = fixture.artifact_bytes("app/target/x86_64/packages");
+
+    let mut second = fixture.visible_shuttle("run", &selected);
+    second.stdin(fs::File::open(fixture.root.join("second.input")).expect("second input"));
+    let second = run(&mut second);
+    expect_status(&second, 0);
+    assert_eq!(second.stdout, b"84\n");
+    let progress = String::from_utf8(second.stderr).expect("reuse progress");
+    assert_eq!(progress.matches("shuttle: reusing ").count(), 5);
+    assert!(!progress.contains("shuttle: compiling "));
+    assert_eq!(
+        fixture.artifact_bytes("app/target/x86_64/packages"),
+        artifacts
+    );
+
+    let mut invalid = fixture.shuttle("run", &selected);
+    invalid.stdin(fs::File::open(fixture.root.join("invalid.input")).expect("invalid input"));
+    let invalid = run(&mut invalid);
+    expect_status(&invalid, 1);
+    assert!(invalid.stdout.is_empty());
+    let expected = if cfg!(windows) {
+        b"cloth error: cloth.lang.errors.ParseError: invalid int32 text\r\n".as_slice()
+    } else {
+        b"cloth error: cloth.lang.errors.ParseError: invalid int32 text\n".as_slice()
+    };
+    assert_eq!(invalid.stderr, expected);
+    assert_eq!(
+        fixture.artifact_bytes("app/target/x86_64/packages"),
+        artifacts
+    );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
 fn broken_standard_library_preserves_completed_consumer_outputs() {
     let fixture = Fixture::new();
     fixture.write(
@@ -1506,7 +1563,7 @@ fn broken_standard_library_preserves_completed_consumer_outputs() {
     );
     fixture.write(
         "app/src/Main.co",
-        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+        "static func Main() throws ParseError { println(int32::parse(\"42\")); }\n",
     );
     let selected = compiler();
     let toolchain_directory = fixture.root.join("toolchain");
@@ -1518,7 +1575,7 @@ fn broken_standard_library_preserves_completed_consumer_outputs() {
 
     let built = run(&mut fixture.shuttle("run", &paired_compiler));
     expect_status(&built, 0);
-    assert_eq!(built.stdout, b"6\n");
+    assert_eq!(built.stdout, b"42\n");
     assert!(built.stderr.is_empty());
 
     let package_directory = fixture.root.join("app/target/x86_64/packages");
@@ -1532,14 +1589,14 @@ fn broken_standard_library_preserves_completed_consumer_outputs() {
     let previous_app = fs::read(&app_artifact).expect("completed app artifact");
     let previous_executable = fs::read(&executable).expect("completed executable");
 
-    let math = toolchain_directory.join("standard-library/src/math/Math.co");
-    let mut source = fs::read_to_string(&math).expect("paired Math source");
+    let parse_error = toolchain_directory.join("standard-library/src/lang/errors/ParseError.co");
+    let mut source = fs::read_to_string(&parse_error).expect("paired ParseError source");
     source.push_str("\nfunc Broken(): int32 { return missing; }\n");
-    fs::write(math, source).expect("break paired Math source");
+    fs::write(parse_error, source).expect("break paired ParseError source");
     let failed = run(&mut fixture.shuttle("run", &paired_compiler));
     expect_status(&failed, 1);
     assert!(failed.stdout.is_empty());
-    assert!(String::from_utf8_lossy(&failed.stderr).contains("Math.co:"));
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("ParseError.co:"));
     assert_eq!(
         fs::read(&cloth_artifact).expect("preserved cloth artifact"),
         previous_cloth
@@ -1555,7 +1612,7 @@ fn broken_standard_library_preserves_completed_consumer_outputs() {
 
     let preserved = run(&mut Command::new(executable));
     expect_status(&preserved, 0);
-    assert_eq!(preserved.stdout, b"6\n");
+    assert_eq!(preserved.stdout, b"42\n");
     assert!(preserved.stderr.is_empty());
 }
 

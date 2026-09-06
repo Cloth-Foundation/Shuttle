@@ -1,5 +1,79 @@
 # Shuttle verification
 
+## Stage 38.4 text-input and primitive-parsing exit audit coordination
+
+Completed with compiler checkpoint 38.4 on Windows on 2026-09-06. Development
+and ASan/UBSan configurations each pass all 281 compiler CTests, including all
+36 compiler-backed Shuttle toolchain cases and 34 native cases. All 51 ordinary
+Rust tests, Rust 1.85 all-target checking, warning-denied Clippy, Rust and C++
+formatting, 14 editor tests, 338 local Markdown targets across 111 files, and
+repository whitespace checks pass.
+
+The coordinated matrix proves redirected stdin inheritance, successful and
+failing primitive parsing, input-independent artifact bytes, exact warm reuse,
+ParseError-specific standard-library invalidation, source-free execution,
+relocated serial/parallel determinism, failed-output preservation, stale-run
+prevention, and direct/whole/separate equivalence. Shuttle continues to treat
+compiler artifacts opaquely and required no production-code change.
+
+Compatibility remains artifact/compiler/runtime 5/5/6 and
+process/receipt/manifest/toolchain-metadata schemas 2/1/1/1 with `cloth`
+v0.3.0. Stage 38 coordination is complete without a format or schema change.
+
+## Stage 38.3 primitive-parsing integration coordination
+
+Completed with compiler checkpoint 38.3 on Windows on 2026-09-06. Development
+and ASan/UBSan configurations each pass all 276 compiler CTests, including all
+36 compiler-backed Shuttle toolchain cases and 34 native cases. All 51 ordinary
+Rust tests, the Rust 1.85 all-target check, warning-denied Clippy, Rust and C++
+formatting, 14 editor tests, documentation links, and repository whitespace
+gates pass.
+
+The native Shuttle matrix inherits redirected stdin unchanged, parses two
+successful values, reports an exact source-defined `ParseError` for invalid
+input, preserves program streams and status, reuses all packages on the second
+run, and proves that input cannot change artifact bytes. Compiler-backed
+toolchain coverage also carries primitive parsing through the exact paired
+`cloth` v0.3.0 source-free package on both targets. Shuttle production code and
+schemas remain unchanged.
+
+Compatibility remains artifact/compiler/runtime 5/5/6 and
+process/receipt/manifest/toolchain-metadata schemas 2/1/1/1.
+
+## Stage 38.2 text-input and parsing foundation coordination
+
+Completed with compiler checkpoint 38.2 on Windows on 2026-09-06. Development
+and ASan/UBSan configurations each pass all 276 compiler CTests, including all
+36 compiler-backed Shuttle toolchain cases and 33 native cases. All 51 ordinary
+Rust tests, warning-denied Clippy, and Rust formatting pass.
+The Rust 1.85 all-target check also remains green.
+
+The selected compiler now advertises and requires `cloth` v0.3.0, while its
+opaque artifacts carry runtime ABI 6. Capability validation, toolchain
+metadata, exact paired-library selection, source-free linking, and native
+execution accept that coordinated identity. Existing cache, invalidation,
+receipt, and output-preservation behavior remains unchanged. Shuttle does not
+read or encode standard input and has no production change in this checkpoint.
+
+Compatibility is artifact/compiler/runtime 5/5/6. Process protocol 2 and
+receipt/manifest/toolchain-metadata schemas 1/1/1 are unchanged. Input
+inheritance and public primitive parsing integration remain scheduled for 38.3.
+
+## Stage 38.1 portable text-input contract
+
+Approved with compiler checkpoint 38.1 on Windows on 2026-09-06. Shuttle owns
+only inheritance of standard input by the launched application. It does not
+read, decode, buffer, log, hash, or place input in compiler requests, artifacts,
+or cache keys. `check` and `build` do not consume it; existing `run --`, stream,
+status, failure-preservation, and stale-run contracts remain unchanged.
+
+This checkpoint changes coordinated roadmap, ledger, proposal, and verification
+documentation only. Shuttle production behavior, tests, package version, and
+schemas are unchanged. Compatibility remains artifact/compiler/runtime 5/5/5
+and process/receipt/manifest/toolchain schemas 2/1/1/1 with `cloth` v0.2.0.
+Runtime ABI 6 and `cloth` v0.3.0 wait for separately authorized checkpoint
+38.2. Documentation links and repository whitespace gates pass.
+
 ## Stage 37.4 portable program-argument exit audit
 
 Completed with the compiler audit on Windows on 2026-09-06. Development and

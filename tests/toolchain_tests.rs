@@ -943,7 +943,7 @@ fn injects_the_compiler_paired_standard_library_without_manifest_boilerplate() {
     );
     fixture.write(
         "app/src/Main.co",
-        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
+        "import cloth.math::Math;\nstatic func Main() throws DivisionByZero, ParseError { println(Math.Gcd(84, 30)); println(int32::parse(\"36\")); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let selected = compiler();
     for target in ["x86_64", "wasm32"] {
@@ -977,7 +977,7 @@ fn injects_the_compiler_paired_standard_library_without_manifest_boilerplate() {
     assert!(receipt.dependencies.iter().any(|dependency| {
         dependency.alias == "cloth"
             && dependency.package.name == "cloth"
-            && dependency.package.version == "0.2.0"
+            && dependency.package.version == "0.3.0"
     }));
 }
 
@@ -995,7 +995,7 @@ fn resolves_paired_standard_library_prelude_from_source_free_artifacts() {
             );
             fixture.write(
                 "app/src/Main.co",
-                "static func Main() { println(PreludeProbe.Value()); }\n",
+                "static func Main() throws ParseError { println(PreludeProbe.Value()); println(int32::parse(\"38\")); }\n",
             );
             let toolchain_directory = fixture.root.join("toolchain");
             fs::create_dir(&toolchain_directory).expect("toolchain directory");
@@ -1077,7 +1077,7 @@ fn standard_library_edits_invalidate_exact_consumers_on_both_targets() {
         );
         fixture.write(
             "app/src/Main.co",
-            "import cloth.math::Math;\nstatic func Main() throws DivisionByZero { println(Math.Gcd(84, 30)); }\n",
+            "static func Main() throws ParseError { println(int32::parse(\"38\")); }\n",
         );
         let selected = compiler();
         let toolchain_directory = fixture.root.join("toolchain");
@@ -1101,10 +1101,11 @@ fn standard_library_edits_invalidate_exact_consumers_on_both_targets() {
         assert_eq!(progress.matches("shuttle: reusing ").count(), 2);
         assert!(!progress.contains("shuttle: checking "));
 
-        let math = toolchain_directory.join("standard-library/src/math/Math.co");
-        let mut source = fs::read_to_string(&math).expect("paired Math source");
+        let parse_error =
+            toolchain_directory.join("standard-library/src/lang/errors/ParseError.co");
+        let mut source = fs::read_to_string(&parse_error).expect("paired ParseError source");
         source.push_str("\n// change the selected standard-library source digest\n");
-        fs::write(math, source).expect("edit paired Math source");
+        fs::write(parse_error, source).expect("edit paired ParseError source");
         let changed = run(fixture
             .visible_shuttle("check", &paired_compiler)
             .args(["--target", target]));
