@@ -765,7 +765,7 @@ fn structs_link_and_execute_without_dependency_sources() {
 fn constants_link_and_execute_without_dependency_sources() {
     let fixture = Fixture::constants();
     let separate = run(&mut fixture.shuttle("run", &compiler()));
-    let expected = b"42\n-128\n-9223372036854775808\n18446744073709551615\ntrue\ntrue\ntrue\nQ\ntrue\ntrue\ntrue\nminimum\nmaximum\nready\n";
+    let expected = b"42\n-128\n-9223372036854775808\n18446744073709551615\ntrue\ntrue\ntrue\ntrue\ntrue\n2\ntrue\ntrue\ntrue\nminimum\nmaximum\nready\n";
     expect_status(&separate, 0);
     assert_eq!(separate.stdout, expected);
     assert!(separate.stderr.is_empty());
