@@ -1,5 +1,65 @@
 # Shuttle verification
 
+## Stage 39.4 Unicode string-traversal exit audit
+
+Completed with the compiler exit audit on Windows on 2026-09-06. Development
+and ASan/UBSan compiler matrices each pass all 296 CTests, including all 36
+compiler-backed Shuttle toolchain cases and 34 native cases. All 51 ordinary
+Rust tests, warning-denied Clippy, Rust formatting, the Rust 1.85 MSRV check,
+both 17-test editor runs, documentation links, and repository gates pass.
+
+Whole, separate, and source-free traversal fixtures remain equivalent on both
+targets. Exact v0.3.0 standard-library pairing, warm reuse, affected
+invalidation, relocated serial/parallel determinism, stale-run prevention, and
+completed-output preservation all remain intact. Shuttle remains opaque to
+source traversal and string contents. Compatibility stays
+artifact/compiler/runtime **6/5/7** with unchanged
+process/receipt/manifest/toolchain schemas **2/1/1/1**.
+
+## Stage 39.3 Unicode string-traversal coordination
+
+Completed with compiler checkpoint 39.3 on Windows on 2026-09-06. Development
+and ASan/UBSan compiler matrices each pass all 294 CTests, including 36
+compiler-backed Shuttle toolchain cases and 34 native cases. All 51 ordinary
+Rust tests, warning-denied Clippy, Rust formatting, and the Rust 1.85 MSRV check
+also pass.
+
+Compiler-backed fixtures execute Unicode scalar indexing and linear string
+iteration through whole, separate, and source-free dependency builds. Exact
+v0.3.0 standard-library pairing, warm reuse, affected invalidation, relocated
+artifacts, failed-output preservation, and stale-run prevention remain intact.
+Shuttle does not inspect source traversal or string contents. Compatibility is
+artifact/compiler/runtime **6/5/7** with unchanged
+process/receipt/manifest/toolchain schemas **2/1/1/1**.
+
+## Stage 39.2 Unicode-scalar artifact coordination
+
+Completed with compiler checkpoint 39.2 on Windows on 2026-09-06. Shuttle now
+requires artifact format 6 through the existing capability and receipt fields;
+protocol 2 and all schemas remain unchanged. Its compiler stubs reject the old
+format, while compiler-backed x86-64 and wasm32 fixtures carry a non-BMP
+character constant through whole, separate, and source-free builds.
+
+All 51 ordinary Rust tests, 36 compiler-backed toolchain cases, 34 native cases,
+warning-denied Clippy, and Rust formatting pass with both development and
+ASan/UBSan compilers. Exact warm reuse, affected invalidation, relocated
+serial/parallel bytes, source-free execution, failed-output preservation, and
+compiler-paired `cloth` v0.3.0 selection remain intact. Compatibility is now
+artifact/compiler/runtime 6/5/6. Documentation links and repository whitespace
+checks pass; traversal remains compiler work for 39.3.
+
+## Stage 39.1 Unicode string-traversal contract coordination
+
+Approved with compiler checkpoint 39.1 on Windows on 2026-09-06. Shuttle owns
+only opaque transport, exact compiler/library selection, cache and dependency
+behavior, linking, and atomic output publication. It does not decode source,
+inspect character constants, expose string storage, or implement traversal.
+
+This checkpoint changes documentation only. Active compatibility remains
+artifact/compiler/runtime 5/5/6 and process/receipt/manifest/toolchain schemas
+2/1/1/1 with `cloth` v0.3.0. Artifact format 6 and runtime ABI 7 remain planned
+for separately authorized checkpoints using existing protocol/schema fields.
+
 ## Stage 38.4 text-input and primitive-parsing exit audit coordination
 
 Completed with compiler checkpoint 38.4 on Windows on 2026-09-06. Development

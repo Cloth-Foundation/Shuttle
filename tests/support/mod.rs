@@ -93,7 +93,15 @@ static final float64 Wide = Quarter + 1.0;
 static final float32 Zero = -0.0;
 static final float32 Tiny = 0.000000000000000000000000000000000000000000001;
 static final bool Enabled = false && (1 / 0 == 0) || Answer == 42;
-static final char Letter = 'Q';
+static final char Letter = '\u{1F9F5}';
+static func Scalar(string text, int32 index): char { return text[index]; }
+static func ThreadCount(string text): int32 {
+  int32 count = 0;
+  for (var scalar in text) {
+    if (scalar == Letter) { count += 1; }
+  }
+  return count;
+}
 ",
         );
         fixture.write(
@@ -111,7 +119,9 @@ static func Main() {
   println(Values.Quarter == 0.25);
   println(Values.Wide == 1.25);
   println(Values.Enabled);
-  println(Values.Letter);
+  println(Values.Letter == '🧵');
+  println(Values.Scalar("A🧵Z", 1) == '🧵');
+  println(Values.ThreadCount("🧵x🧵"));
   println(Values.Tiny > 0.0);
   println(Copy == Values.Tiny);
   println(Values.Zero == 0.0);

@@ -57,6 +57,42 @@ Stage 37 coordination is complete following the 37.4 exit audit on 2026-09-06.
 
 Stage 38 coordination is complete following the 38.4 exit audit on 2026-09-06.
 
+Stage 39 coordination is complete following the 39.4 exit audit on 2026-09-06.
+
+## Stage 39: Unicode string-traversal coordination
+
+Status: **complete — coordinated 39.4 exit audit passed 2026-09-06**
+
+The compiler's [Stage 39 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_39_unicode_string_traversal.md)
+widens `char` constants to Unicode scalars and adds checked string indexing and
+linear string iteration. Shuttle remains opaque to source text, scalar values,
+string contents, and traversal.
+
+Objective: carry the compiler's artifact/runtime transitions through exact
+package selection, reuse, linking, and deterministic publication without
+adding source-language policy to Shuttle.
+
+Deliverables:
+
+1. **39.1 — Contract (complete).** Record opaque ownership, artifact/runtime
+   transitions, exact standard-library pairing, verification, and non-goals.
+2. **39.2 — Scalar artifact coordination (complete).** Accept only artifact
+   format 6 from the selected compiler and update capability, receipt, fixture,
+   rebuild, source-free, and both-target coverage without interpreting
+   character data.
+3. **39.3 — Traversal coordination (complete).** Carry runtime ABI 7 through native link,
+   execution, reuse, invalidation, and source-free tests without inspecting
+   string operations or contents.
+4. **39.4 — Exit audit (complete).** Close compatibility, determinism,
+   failure-preservation, Rust/MSRV, documentation, formatting, sanitizer, and
+   repository gates.
+
+Stage 39 retains artifact/compiler/runtime compatibility 6/5/7.
+Process/receipt/manifest/toolchain schemas remain 2/1/1/1 with `cloth` v0.3.0.
+The coordinated compatibility, determinism, failure-preservation, native,
+cross-target, sanitizer, Rust/MSRV, and repository matrices pass while Shuttle
+continues to treat runtime ABI as opaque compiler-owned metadata.
+
 ## Stage 38: Portable text-input coordination
 
 Status: **complete — coordinated 38.4 exit audit passed 2026-09-06**

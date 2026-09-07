@@ -42,8 +42,44 @@ exit audit on 2026-09-05.
 Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
 Stage 37 coordination is complete following the 37.4 exit audit on 2026-09-06.
 Stage 38 coordination is complete following the 38.4 exit audit on 2026-09-06.
+Stage 39 coordination is complete following the 39.4 exit audit on 2026-09-06.
 
 ## Scheduled work
+
+### Stage 39: Unicode string-traversal coordination
+
+- [x] Record opaque source/scalar/traversal ownership, artifact-format-6 and
+  runtime-ABI-7 transitions, exact v0.3.0 standard-library pairing, unchanged
+  schemas, coordinated verification, and non-goals.
+
+  Completed with compiler 39.1 on 2026-09-06. This checkpoint changes
+  documentation only, so active compatibility remains 5/5/6 and 2/1/1/1.
+- [x] During 39.2, accept artifact format 6 through existing capability and
+  receipt fields; update compiler stubs, fixtures, rebuilds, source-free
+  consumers, both targets, exact reuse, and invalidation without parsing
+  character values.
+
+  Completed 2026-09-06. Format 6 is required by production negotiation and
+  stubs. Existing constant, cross-target, source-free, relocation, reuse,
+  invalidation, and failure-preservation matrices now carry a non-BMP character
+  while Shuttle remains opaque to its value.
+- [x] During 39.3, carry runtime ABI 7 through native linking, Unicode traversal
+  consumers, exact paired-library selection, reuse, invalidation,
+  failure-preservation, and stale-run prevention.
+
+  Completed 2026-09-06. Compiler-backed whole, separate, and source-free
+  fixtures execute scalar indexing and iteration under runtime ABI 7 while
+  exact pairing, reuse, invalidation, and atomic output behavior remain intact.
+  Shuttle does not inspect the operations or their contents.
+- [x] Complete the coordinated 39.4 development, sanitizer, native,
+  cross-target, Rust/MSRV, editor, documentation, formatting, and repository
+  gates.
+
+  Completed 2026-09-06. Both 296-test compiler configurations, all 36
+  compiler-backed toolchain cases, all 34 native cases, 51 ordinary Rust tests,
+  Rust 1.85, warning-denied Clippy, formatting, editor, documentation, and
+  repository gates pass. Compatibility remains 6/5/7 and 2/1/1/1 with
+  `cloth` v0.3.0.
 
 ### Stage 38: Portable text-input coordination
 
