@@ -166,6 +166,68 @@ fn enums_preserve_native_and_parallel_package_behavior() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn nullable_values_cross_whole_separate_and_source_free_packages() {
+    let serial = Fixture::nullable_values();
+    let parallel = Fixture::nullable_values();
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, support::NULLABLE_VALUES_OUTPUT);
+    assert_eq!(second.stdout, first.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+
+    let artifacts = serial.artifact_bytes("app/target/x86_64/packages");
+    let executable = serial.root.join(format!(
+        "app/target/x86_64/app{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let executable_bytes = fs::read(&executable).expect("nullable executable");
+    let maybe_path = serial.root.join("models/src/Maybe.co");
+    let valid_maybe = fs::read_to_string(&maybe_path).expect("nullable source");
+    serial.write(
+        "models/src/Maybe.co",
+        "import Payload;\nint32?? invalid;\nstatic func Echo(Payload? value): Payload? { return value; }\n",
+    );
+    let failed = run(&mut serial.shuttle("run", &selected));
+    expect_status(&failed, 1);
+    assert!(failed.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&failed.stderr)
+            .contains("nullable qualification cannot be repeated")
+    );
+    assert_eq!(
+        artifacts,
+        serial.artifact_bytes("app/target/x86_64/packages")
+    );
+    assert_eq!(
+        executable_bytes,
+        fs::read(&executable).expect("preserved nullable executable")
+    );
+    let preserved = run(&mut Command::new(&executable));
+    expect_status(&preserved, 0);
+    assert_eq!(preserved.stdout, support::NULLABLE_VALUES_OUTPUT);
+    assert!(preserved.stderr.is_empty());
+    serial.write("models/src/Maybe.co", &valid_maybe);
+
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, support::NULLABLE_VALUES_OUTPUT);
+    assert!(whole.stderr.is_empty());
+    let source_free = source_free_run(&serial);
+    expect_status(&source_free, 0);
+    assert_eq!(source_free.stdout, support::NULLABLE_VALUES_OUTPUT);
+    assert!(source_free.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
 fn structs_preserve_relocated_serial_parallel_artifacts() {
     let serial = Fixture::structs();
     let parallel = Fixture::structs();
@@ -765,7 +827,7 @@ fn structs_link_and_execute_without_dependency_sources() {
 fn constants_link_and_execute_without_dependency_sources() {
     let fixture = Fixture::constants();
     let separate = run(&mut fixture.shuttle("run", &compiler()));
-    let expected = b"42\n-128\n-9223372036854775808\n18446744073709551615\ntrue\ntrue\ntrue\ntrue\ntrue\n2\ntrue\ntrue\ntrue\nminimum\nmaximum\nready\n";
+    let expected = b"42\n-128\n-9223372036854775808\n18446744073709551615\ntrue\ntrue\ntrue\ntrue\ntrue\n2\ntrue\ntrue\ntrue\ntrue\nminimum\nmaximum\nready\n";
     expect_status(&separate, 0);
     assert_eq!(separate.stdout, expected);
     assert!(separate.stderr.is_empty());

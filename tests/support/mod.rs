@@ -16,6 +16,8 @@ pub struct Fixture {
 pub const STRUCT_OUTPUT: &[u8] = b"100\n101\ntrue\n101\nalive\n<data-models.Packet>\ndata-models.Packet\n100\n101\n104\ninitial\n";
 pub const CHECKED_UPDATES_OUTPUT: &[u8] = b"7\n22\n1\n21\n42\n";
 pub const INTEGER_CONVERSIONS_OUTPUT: &[u8] = b"4464\n65535\n0\n44\n255\n";
+pub const NULLABLE_VALUES_OUTPUT: &[u8] =
+    b"true\n41\n42\nkept\ndata-models.Status.Ready\n12\ntrue\n";
 pub const NUMERIC_NOTATION_OUTPUT: &[u8] = b"240\n42\n18446744073709551615\n125\n44\n0\n8\n";
 pub const TYPED_LITERALS_OUTPUT: &[u8] = b"7\n42\n18446744073709551615\n0.5\n44\n0\n8\n";
 pub const TYPED_ERRORS_OUTPUT: &[u8] = b"7\n";
@@ -67,6 +69,53 @@ impl Fixture {
         fixture
     }
 
+    pub fn nullable_values() -> Self {
+        let fixture = Self::new();
+        fixture.write(
+            "models/src/Payload.co",
+            r"
+struct {
+  string Text;
+  int32 Count;
+  Payload(string text, int32 count) { Text = text; Count = count; }
+  func Incremented(): int32 { return Count + 1; }
+}
+",
+        );
+        fixture.write("models/src/Status.co", "enum { Ready, Done }\n");
+        fixture.write(
+            "models/src/Maybe.co",
+            r"
+import Payload;
+static func Echo(Payload? value): Payload? { return value; }
+static func Widen(int16? value): int32? { return value; }
+",
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r#"
+import models::Maybe;
+import models::Payload;
+import models::Status;
+static func Main() {
+  Payload? present = Maybe.Echo(Payload("kept", 41));
+  println(present != null);
+  println((present?.Count)!);
+  println((present?.Incremented())!);
+  println(present?.Text ?? "missing");
+  Status? status = Status.Ready;
+  println(status!);
+  int16? small = 12;
+  int32? wide = Maybe.Widen(small);
+  println(wide!);
+  Payload? absent = Maybe.Echo(null);
+  println(absent == null);
+}
+"#,
+        );
+        fixture
+    }
+
     pub fn constants() -> Self {
         let fixture = Self::new();
         fixture.write(
@@ -102,6 +151,7 @@ static func ThreadCount(string text): int32 {
   }
   return count;
 }
+static func Middle(string text): string { return text::slice(1, 3); }
 ",
         );
         fixture.write(
@@ -122,6 +172,7 @@ static func Main() {
   println(Values.Letter == '🧵');
   println(Values.Scalar("A🧵Z", 1) == '🧵');
   println(Values.ThreadCount("🧵x🧵"));
+  println(Values.Middle("A🧵BC") == "🧵B");
   println(Values.Tiny > 0.0);
   println(Copy == Values.Tiny);
   println(Values.Zero == 0.0);

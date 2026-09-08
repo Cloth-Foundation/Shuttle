@@ -43,8 +43,87 @@ Stage 36 coordination is complete following the 36.4 exit audit on 2026-09-06.
 Stage 37 coordination is complete following the 37.4 exit audit on 2026-09-06.
 Stage 38 coordination is complete following the 38.4 exit audit on 2026-09-06.
 Stage 39 coordination is complete following the 39.4 exit audit on 2026-09-06.
+Stage 40 coordination is complete following the compiler's 40.4 exit audit on
+2026-09-07.
+Stage 41 coordination is complete following the compiler's separately
+authorized 41.4 exit audit on 2026-09-07.
 
 ## Scheduled work
+
+### Stage 41: Uniform-nullability coordination
+
+- [x] Record opaque source/type/layout ownership, the planned
+  artifact/compiler/runtime 7/6/9 transition, exact v0.3.0 standard-library
+  pairing, unchanged protocol/schemas, coordinated verification, and
+  non-goals.
+
+  Completed with compiler 41.1 on 2026-09-07. This documentation-only
+  checkpoint leaves compatibility at 6/5/8 and 2/1/1/1. Shuttle adds no source,
+  tag, payload, flow, or safe-operation interpretation.
+- [x] During 41.2, preserve existing compiler coordination while nullable
+  values and safe operations are internal verified IR and not a separately
+  releasable native feature.
+
+  Completed with compiler 41.2 on 2026-09-07. Development and sanitizer
+  configurations each pass all 312 compiler CTests, including the
+  compiler-backed and native Shuttle suites. The native/artifact gate preserves
+  production compatibility at 6/5/8 and schemas at 2/1/1/1.
+- [x] During 41.3, carry artifact format 7, compiler ABI 6, and runtime ABI 9
+  through capability, receipt, compiler identity, standard-library pairing,
+  native linking, execution, reuse, invalidation, failure preservation, and
+  stale-run prevention.
+
+  Completed with compiler 41.3 on 2026-09-07. Shuttle requires format 7 in
+  capabilities and receipts, rejects stale format 6 data, and retains schemas
+  2/1/1/1. Nullable fixtures pass deterministic x86-64/wasm32 artifacts, exact
+  reuse, affected dependency invalidation, whole/separate/source-free native
+  execution, and serial/parallel equivalence. All 51 ordinary Rust tests, 37
+  compiler-backed tests, 35 native tests, formatting, and warning-denied Clippy
+  pass.
+- [x] Complete the coordinated 41.4 development, sanitizer, native,
+  cross-target, Rust/MSRV, editor, documentation, formatting, and repository
+  gates.
+
+  Completed with compiler 41.4 on 2026-09-07. Nullable package edits now prove
+  deliberate failure diagnostics and atomic preservation of both-target
+  artifacts and the last native executable in addition to determinism, reuse,
+  affected invalidation, whole/separate/source-free execution, and stale-run
+  prevention. Both 335-test compiler configurations, all 51 ordinary Rust
+  tests, 37 compiler-backed tests, 35 native tests, Rust 1.85, Clippy,
+  formatting, documentation, and repository gates pass.
+
+### Stage 40: Unicode string-slicing coordination
+
+- [x] Record opaque source/bounds/content/allocation ownership, the planned
+  runtime-ABI-8 transition, exact v0.3.0 standard-library pairing, unchanged
+  format/compiler/protocol/schemas, coordinated verification, and non-goals.
+
+  Completed with compiler 40.1 on 2026-09-06. This documentation-only
+  checkpoint leaves compatibility at 6/5/7 and 2/1/1/1. Shuttle adds no source
+  parsing or string-content behavior.
+- [x] During 40.2, preserve existing compiler coordination while slicing is
+  internal verified IR and not a separately releasable feature.
+
+  Completed with compiler 40.2 on 2026-09-06. Shuttle remains unchanged and
+  opaque; compiler frontend validation succeeds while LLVM/native publication
+  is rejected until runtime and lowering arrive together in 40.3.
+- [x] During 40.3, carry runtime ABI 8 through native linking, slicing
+  consumers, exact paired-library selection, reuse, invalidation,
+  failure-preservation, and stale-run prevention.
+
+  Completed with compiler 40.3 on 2026-09-07. The existing public protocol and
+  schemas carry runtime ABI 8 without reinterpretation. Whole, separate, and
+  source-free native fixtures execute the same Unicode-scalar slice while
+  retaining exact compiler/library pairing, reuse, invalidation, and atomic
+  publication behavior.
+- [x] Complete the coordinated 40.4 development, sanitizer, native,
+  cross-target, Rust/MSRV, editor, documentation, formatting, and repository
+  gates.
+
+  Completed with compiler 40.4 on 2026-09-07. Both compiler configurations pass
+  all 36 toolchain and 34 native cases. All 51 ordinary Rust tests, Rust 1.85,
+  warning-denied Clippy, formatting, documentation, and repository gates pass
+  without a Shuttle production or schema change.
 
 ### Stage 39: Unicode string-traversal coordination
 

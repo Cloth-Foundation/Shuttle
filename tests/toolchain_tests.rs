@@ -22,6 +22,68 @@ use support::{
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST"]
+fn nullable_values_have_deterministic_cross_target_artifacts_and_reuse() {
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let serial = Fixture::nullable_values();
+        let parallel = Fixture::nullable_values();
+        parallel.reverse_dependencies();
+        for (fixture, jobs) in [(&serial, "1"), (&parallel, "4")] {
+            let checked = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&checked, 0);
+            assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+        }
+        let directory = format!("app/target/{target}/check/packages");
+        let previous = serial.artifact_bytes(&directory);
+        assert_eq!(previous, parallel.artifact_bytes(&directory));
+
+        let reused = run(serial
+            .visible_shuttle("check", &selected)
+            .args(["--target", target]));
+        expect_status(&reused, 0);
+        let progress = String::from_utf8_lossy(&reused.stderr);
+        assert_eq!(
+            progress.matches("shuttle: reusing ").count(),
+            5,
+            "{progress}"
+        );
+
+        serial.write(
+            "models/src/Maybe.co",
+            "import Payload;\nstatic final int32 Revision = 1;\nstatic func Echo(Payload? value): Payload? { return value; }\nstatic func Widen(int16? value): int32? { return value; }\n",
+        );
+        let changed = run(serial
+            .visible_shuttle("check", &selected)
+            .args(["--target", target]));
+        expect_status(&changed, 0);
+        let current = serial.artifact_bytes(&directory);
+        assert_ne!(previous["data-models"], current["data-models"]);
+        assert_ne!(previous["app"], current["app"]);
+        for package in ["cloth", "foundation", "tools"] {
+            assert_eq!(previous[package], current[package]);
+        }
+
+        serial.write(
+            "models/src/Maybe.co",
+            "import Payload;\nint32?? invalid;\nstatic func Echo(Payload? value): Payload? { return value; }\n",
+        );
+        let failed = run(serial
+            .shuttle("check", &selected)
+            .args(["--target", target]));
+        expect_status(&failed, 1);
+        assert!(failed.stdout.is_empty());
+        assert!(
+            String::from_utf8_lossy(&failed.stderr)
+                .contains("nullable qualification cannot be repeated")
+        );
+        assert_eq!(current, serial.artifact_bytes(&directory));
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
 fn checked_updates_have_deterministic_cross_target_artifacts() {
     let selected = compiler();
     for target in ["x86_64", "wasm32"] {
