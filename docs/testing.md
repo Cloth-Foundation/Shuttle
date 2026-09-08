@@ -1,5 +1,75 @@
 # Shuttle verification
 
+## Stage 42.4 runtime-sized array exit coordination
+
+Completed with compiler 42.4 on Windows on 2026-09-08. Development and
+ASan/UBSan compiler configurations each pass all 350 CTests, including every
+38 compiler-backed and 36 native Shuttle case. The dedicated fixture produces
+byte-identical x86-64 and wasm32 package artifacts from distinct roots and job
+schedules; its relocated native executables are also byte-identical.
+
+Whole-project, separate-package, and source-free execution agree. Exact reuse,
+affected invalidation, failed-check and failed-run output preservation, and the
+previous runnable executable all pass. The real `F:\Cloth` project checks on
+both targets, emits the exact token-buffer output, reuses `cloth` and `clothc`,
+and preserves its artifact hashes on a warm build.
+
+All 51 ordinary Rust tests, Rust 1.85 checking, warning-denied Clippy, and Rust
+formatting pass. Shuttle remains opaque to runtime-sized array syntax, default
+values, layouts, and failures. Production code, artifact/compiler/runtime
+compatibility 7/6/9, schemas 2/1/1/1, and `cloth` v0.3.0 are unchanged.
+
+## Stage 42.3 runtime-sized array integration
+
+Completed with compiler 42.3 on Windows on 2026-09-08. Runtime-sized arrays
+pass serial and parallel package checks on x86-64 and wasm32 with deterministic
+artifacts. Exact reuse, affected dependency invalidation, and failed-check
+artifact preservation remain observable through normal Shuttle progress and
+publication behavior.
+
+Separate-package, whole-project, and source-free native execution agree for a
+nullable struct array whose element type comes from a dependency artifact. A
+failed native rebuild preserves both completed artifacts and the runnable
+executable. The real `F:\Cloth` project checks on both targets and its
+`Token?[]` buffer runs through Shuttle with the expected EOF-terminated output.
+
+Shuttle production code, protocol and schemas remain unchanged. Compatibility
+is still 7/6/9 and 2/1/1/1 with the compiler-paired `cloth` v0.3.0 package.
+
+## Stage 42.2 runtime-sized array frontend coordination
+
+Completed with compiler 42.2 on Windows on 2026-09-08. Development and
+ASan/UBSan compiler configurations each pass all 338 CTests, including the
+unchanged 37 compiler-backed and 35 native Shuttle cases. A dedicated compiler
+integration test proves that x86-64 interface/object and wasm32 interface
+protocol-v2 compile requests reject runtime-sized construction before staging
+or publishing an artifact.
+
+All 51 ordinary Rust tests, Rust 1.85 checking, warning-denied Clippy, and Rust
+formatting pass. No ignored native-wrapper test is counted as ordinary Rust
+coverage.
+
+Shuttle remains opaque to `T[:length]`, element defaults, length evaluation,
+and MIR. No production Rust, protocol, schema, manifest, cache, or publication
+logic changes. Compatibility remains 7/6/9 and 2/1/1/1, with the exact
+compiler-paired `cloth` v0.3.0 distribution. Native/toolchain integration
+remains gated on separately authorized compiler 42.3.
+
+## Stage 42.1 runtime-sized fixed-array coordination
+
+Approved and recorded with compiler 42.1 on 2026-09-07. This
+documentation-only checkpoint makes Shuttle explicitly opaque to
+`T[:length]`, element defaults, allocation failures, layouts, and bootstrap
+token contents. Compatibility remains artifact/compiler/runtime 7/6/9,
+schemas remain 2/1/1/1, and the compiler-paired `cloth` package remains
+v0.3.0.
+
+No Shuttle production code, protocol, schema, manifest, cache, or publication
+behavior changes. The completed Stage 41 baseline remains 51 ordinary Rust
+tests, 37 compiler-backed cases, and 35 native cases. Coordinated implementation
+and bootstrap verification begin only after separate compiler 42.2
+authorization; compiler 42.2 has since completed.
+
 ## Stage 41.4 uniform-nullability exit coordination
 
 Completed with compiler checkpoint 41.4 on Windows on 2026-09-07. Development
