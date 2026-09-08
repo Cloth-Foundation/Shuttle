@@ -27,7 +27,7 @@ It accepts no other argument and returns one UTF-8 JSON object plus LF, empty
 stderr, and status 0:
 
 ```json
-{"schema":1,"protocols":[1,2],"artifact_formats":[6],"compiler_id":"<64 lowercase hex digits>","standard_library":{"package":"cloth","version":"0.3.0"},"operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
+{"schema":1,"protocols":[1,2],"artifact_formats":[7],"compiler_id":"<64 lowercase hex digits>","standard_library":{"package":"cloth","version":"0.3.0"},"operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
 ```
 
 The digest placeholder represents the artifact contract's actual compiler
@@ -36,7 +36,7 @@ optional native tools are installed. Interface checking must work without
 them. Compiler/native-tool discovery failures are diagnosed only when the
 requested operation needs those tools.
 
-Shuttle requires protocol 2 and artifact format 6 for this workflow. A
+Shuttle requires protocol 2 and artifact format 7 for this workflow. A
 missing/malformed query or unsupported required capability fails clearly;
 there is no silent fallback to a whole-project build. Old clients retain v1.
 Tests invoke v1 explicitly as the equivalence oracle.
@@ -173,7 +173,7 @@ stdout. The object has these required fields, with no omitted fields:
 ```json
 {
   "schema": 1,
-  "artifact_format": 6,
+  "artifact_format": 7,
   "artifact_id": "<64 lowercase hex digits>",
   "kind": "object",
   "package": {"name": "models", "version": "0.1.0"},

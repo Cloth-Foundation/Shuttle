@@ -59,6 +59,85 @@ Stage 38 coordination is complete following the 38.4 exit audit on 2026-09-06.
 
 Stage 39 coordination is complete following the 39.4 exit audit on 2026-09-06.
 
+Stage 40 coordination is complete following the compiler's 40.4 exit audit on
+2026-09-07.
+
+Stage 41 coordination is complete following the compiler's 41.4 exit audit on
+2026-09-07.
+
+## Stage 41: Uniform-nullability coordination
+
+Status: **complete — coordinated 41.4 exit audit passed 2026-09-07**
+
+The compiler's [Stage 41 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_41_uniform_nullability.md)
+adds tagged nullable primitive, enum, and struct values, safe instance calls,
+and non-callable safe meta queries. Shuttle remains opaque to source syntax,
+presence tags, payloads, flow analysis, and safe-operation behavior.
+
+Objective: carry the compiler's coordinated artifact/compiler/runtime
+transition through exact package selection, cache identity, invalidation,
+linking, and deterministic publication without adding source-language or
+payload policy to Shuttle.
+
+Deliverables:
+
+1. **41.1 — Contract (complete).** Record opaque ownership, the planned 7/6/9
+   compatibility transition, unchanged protocol/schemas/library version, exact
+   pairing, verification, and non-goals.
+2. **41.2 — Frontend coordination (complete).** Preserve current production behavior while
+   nullable values and safe operations remain internal verified compiler IR and
+   are not a separately releasable native feature.
+3. **41.3 — Toolchain integration (complete).** Carry artifact format 7, compiler ABI 6,
+   and runtime ABI 9 through capabilities, receipts, compiler identity,
+   standard-library rebuilding, native linking, execution, reuse,
+   invalidation, source-free tests, and stale-run prevention.
+4. **41.4 — Exit audit (complete).** Close compatibility, determinism,
+   failure-preservation, Rust/MSRV, documentation, formatting, sanitizer, and
+   repository gates.
+
+The coordinated 41.4 audit closes compatibility, both-target determinism,
+exact reuse, affected invalidation, source-free and native execution, failure
+preservation, stale-run prevention, Rust/MSRV, documentation, sanitizer, and
+repository gates. Process/receipt/manifest/toolchain schemas remain 2/1/1/1,
+`cloth` remains v0.3.0, and Shuttle stays opaque to source and representation.
+
+## Stage 40: Unicode string-slicing coordination
+
+Status: **complete — coordinated 40.4 exit audit passed 2026-09-07**
+
+The compiler's [Stage 40 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_40_unicode_string_slicing.md)
+adds intrinsic Unicode-scalar string slicing and uses runtime ABI 8. Shuttle
+remains opaque to source syntax, bounds, string contents, and allocation.
+
+Objective: carry the compiler's runtime transition through exact package
+selection, reuse, linking, and deterministic publication without adding
+source-language policy or a schema change to Shuttle.
+
+Deliverables:
+
+1. **40.1 — Contract (complete).** Record opaque ownership, runtime ABI 8,
+   unchanged artifact/compiler/protocol/schema/library versions, exact pairing,
+   verification, and non-goals.
+2. **40.2 — Compiler coordination (complete).** Preserve current behavior while
+   slicing remains internal compiler IR and is not a separately releasable
+   feature.
+3. **40.3 — Runtime coordination (complete).** Carry runtime ABI 8 through
+   capability, receipt, compiler identity, native linking, execution, reuse,
+   invalidation, source-free tests, and stale-run prevention.
+4. **40.4 — Exit audit (complete).** Close compatibility, determinism,
+   failure-preservation, Rust/MSRV, documentation, formatting, sanitizer, and
+   repository gates.
+
+Checkpoint 40.3 advances compatibility to artifact/compiler/runtime 6/5/8.
+Process/receipt/manifest/toolchain schemas remain 2/1/1/1 with `cloth` v0.3.0.
+Shuttle carries the compiler-owned compatibility metadata opaquely and verifies
+whole, separate, and source-free slicing with exact reuse and invalidation.
+
+The coordinated 40.4 audit passes both complete compiler-backed Shuttle suites
+with development and sanitizer compilers, all ordinary Rust tests, Rust 1.85,
+warning-denied Clippy, formatting, documentation, and repository gates. It
+changes no Shuttle production code, protocol, schema, or compatibility value.
+
 ## Stage 39: Unicode string-traversal coordination
 
 Status: **complete — coordinated 39.4 exit audit passed 2026-09-06**

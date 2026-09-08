@@ -1,5 +1,126 @@
 # Shuttle verification
 
+## Stage 41.4 uniform-nullability exit coordination
+
+Completed with compiler checkpoint 41.4 on Windows on 2026-09-07. Development
+and ASan/UBSan compiler configurations each pass all 335 CTests, including all
+37 compiler-backed Shuttle cases and 35 native cases. All 51 ordinary Rust
+tests, Rust 1.85 checking, warning-denied Clippy, Rust formatting,
+documentation links, and repository whitespace checks pass.
+
+The nullable fixture retains deterministic x86-64/wasm32 artifacts under
+relocation and scheduling changes, exact reuse, affected-only invalidation,
+unchanged independent packages, and equivalent whole, separate, source-free,
+and native execution. A malformed repeated-nullability edit now explicitly
+proves that failed checks preserve every completed artifact and failed native
+runs preserve both artifacts and the previous executable without running stale
+code. Compatibility remains 7/6/9, schemas remain 2/1/1/1, and `cloth` remains
+v0.3.0.
+
+## Stage 41.3 uniform-nullability toolchain coordination
+
+Completed with compiler checkpoint 41.3 on Windows on 2026-09-07. Development
+and ASan/UBSan compiler configurations each pass all 329 CTests, including 37
+compiler-backed Shuttle cases and 35 native cases. All 51 ordinary Rust tests,
+warning-denied Clippy, and Rust formatting pass.
+
+Shuttle advertises and requires artifact format 7 through the existing
+capability and receipt schemas and rejects stale format 6 data. Nullable
+fixtures verify deterministic x86-64 and wasm32 artifacts, exact warm reuse,
+affected dependency invalidation, unchanged independent packages, and
+serial/parallel equivalence. Whole-project, separate-package, and source-free
+native execution produce the same output. Compiler ABI 6 and runtime ABI 9
+remain opaque compiler-owned compatibility data; schemas stay 2/1/1/1 and
+`cloth` stays v0.3.0.
+
+## Stage 41.2 uniform-nullability frontend coordination
+
+Completed with compiler checkpoint 41.2 on Windows on 2026-09-07. Development
+and ASan/UBSan compiler configurations each pass all 312 CTests, including the
+compiler-backed Shuttle toolchain suite and the native Shuttle suite. Nullable
+values and safe operations remain compiler-owned verified IR; the explicit
+native/artifact gate prevents a partial package feature from being published.
+
+Shuttle production code, process protocol 2, receipt/manifest/toolchain schemas
+1/1/1, artifact/compiler/runtime compatibility 6/5/8, and the paired `cloth`
+v0.3.0 distribution remain unchanged.
+
+## Stage 41.1 uniform-nullability contract coordination
+
+Approved with compiler checkpoint 41.1 on Windows on 2026-09-07. Shuttle owns
+only opaque compatibility transport, exact compiler/library selection, cache
+and dependency behavior, native linking, and atomic output publication. It does
+not parse nullable syntax, inspect presence tags or payloads, implement flow
+analysis, or determine safe-operation behavior.
+
+Checkpoint 41.3 will advance artifact/compiler/runtime compatibility from
+6/5/8 to 7/6/9 through existing capability, receipt, compiler-identity,
+invalidation, and link fields. Process protocol 2 and
+receipt/manifest/toolchain-metadata schemas 1/1/1 remain unchanged; `cloth`
+remains v0.3.0. This checkpoint changes documentation only and adds no Shuttle
+production behavior.
+
+## Stage 40.4 string-slicing exit audit coordination
+
+Completed with compiler checkpoint 40.4 on Windows on 2026-09-07. Development
+and ASan/UBSan compiler configurations each pass all 309 CTests, including all
+36 compiler-backed Shuttle toolchain cases and 34 native cases. All 51 ordinary
+Rust tests, Rust 1.85 all-target checking, warning-denied Clippy, Rust
+formatting, both 19-test editor runs, documentation links, and repository gates
+pass.
+
+Whole, separate, and source-free slicing retain exact compiler/library pairing,
+warm reuse, affected invalidation, relocated serial/parallel determinism,
+stale-run prevention, and completed-output preservation. Shuttle remains opaque
+to slicing syntax, Unicode-scalar bounds, string contents, allocation, and GC
+roots. Compatibility remains artifact/compiler/runtime 6/5/8 with `cloth`
+v0.3.0 and unchanged process/receipt/manifest/toolchain schemas 2/1/1/1.
+
+## Stage 40.3 string-slicing runtime coordination
+
+Completed with compiler checkpoint 40.3 on Windows on 2026-09-07. Development
+and ASan/UBSan compiler configurations each pass all 308 CTests, including 36
+compiler-backed Shuttle toolchain cases and 34 native cases. All 51 ordinary
+Rust tests, warning-denied Clippy, and the Rust 1.85 MSRV check also pass.
+
+The package fixture executes one Unicode-scalar slice through whole-project,
+separate-package, and source-free native paths. Existing tests verify exact
+compiler/library selection, reuse, dependency invalidation, link behavior, and
+failure-preserving atomic publication. Shuttle remains opaque to source syntax,
+string contents, scalar bounds, allocation, and GC roots.
+
+Artifact/compiler/runtime compatibility is 6/5/8 with `cloth` v0.3.0.
+Process, receipt, manifest, and toolchain-metadata schemas remain 2/1/1/1; no
+Shuttle production or schema change was required.
+
+## Stage 40.2 string-slicing compiler coordination
+
+Completed with compiler checkpoint 40.2 on Windows on 2026-09-06. Clean
+development and ASan/UBSan compiler configurations each pass all 296 CTests,
+including the existing compiler-backed Shuttle toolchain and native matrices.
+Shuttle code and schemas are unchanged: it remains opaque to slice syntax,
+bounds, HIR, MIR, and string contents.
+
+Compiler frontend validation now retains dedicated verified slicing IR, while
+LLVM emission rejects the operation behind an explicit Stage 40.3 gate. No
+partial native or package artifact can therefore be published. Compatibility
+remains artifact/compiler/runtime 6/5/7, schemas remain 2/1/1/1, and `cloth`
+remains v0.3.0.
+
+## Stage 40.1 Unicode string-slicing contract coordination
+
+Approved with compiler checkpoint 40.1 on Windows on 2026-09-06. Shuttle owns
+only opaque compatibility transport, exact compiler/library selection, cache
+and dependency behavior, native linking, and atomic output publication. It does
+not parse slice syntax, inspect scalar bounds or string contents, or own result
+allocation.
+
+Checkpoint 40.3 will advance runtime ABI 7 to 8 through existing capability,
+receipt, compiler-identity, invalidation, and link fields. Artifact/compiler
+compatibility remains 6/5; protocol and schemas remain 2/1/1/1; `cloth` remains
+v0.3.0. This checkpoint changes documentation only and adds no Shuttle
+production behavior.
+
 ## Stage 39.4 Unicode string-traversal exit audit
 
 Completed with the compiler exit audit on Windows on 2026-09-06. Development
