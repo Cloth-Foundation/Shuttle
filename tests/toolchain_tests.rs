@@ -84,6 +84,75 @@ fn nullable_values_have_deterministic_cross_target_artifacts_and_reuse() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST"]
+fn runtime_sized_arrays_have_deterministic_cross_target_artifacts() {
+    let selected = compiler();
+    for target in ["x86_64", "wasm32"] {
+        let serial = Fixture::runtime_sized_arrays();
+        let parallel = Fixture::runtime_sized_arrays();
+        parallel.reverse_dependencies();
+        for (fixture, jobs) in [(&serial, "1"), (&parallel, "4")] {
+            let checked = run(fixture
+                .shuttle("check", &selected)
+                .args(["--target", target, "--jobs", jobs]));
+            expect_status(&checked, 0);
+            assert!(checked.stdout.is_empty() && checked.stderr.is_empty());
+        }
+        let directory = format!("app/target/{target}/check/packages");
+        let previous = serial.artifact_bytes(&directory);
+        assert_eq!(previous, parallel.artifact_bytes(&directory));
+
+        let reused = run(serial
+            .visible_shuttle("check", &selected)
+            .args(["--target", target]));
+        expect_status(&reused, 0);
+        assert_eq!(
+            String::from_utf8_lossy(&reused.stderr)
+                .matches("shuttle: reusing ")
+                .count(),
+            5
+        );
+
+        let payload_path = serial.root.join("models/src/Payload.co");
+        let payload = fs::read_to_string(&payload_path).expect("array payload source");
+        let changed_payload = payload.replace(
+            "Payload(string text, int32 count) { Text = text; Count = count; }",
+            "Payload(string text, int32 count) { Text = text; Count = count; }\n  static func Revision(): int32 { return 1; }",
+        );
+        assert_ne!(payload, changed_payload);
+        serial.write("models/src/Payload.co", &changed_payload);
+        let changed = run(serial
+            .visible_shuttle("check", &selected)
+            .args(["--target", target]));
+        expect_status(&changed, 0);
+        let progress = String::from_utf8_lossy(&changed.stderr);
+        let current = serial.artifact_bytes(&directory);
+        for package in ["data-models", "app"] {
+            assert_ne!(previous[package], current[package]);
+            assert!(progress.contains(&format!("shuttle: checking {package} ")));
+        }
+        for package in ["cloth", "foundation", "tools"] {
+            assert_eq!(previous[package], current[package]);
+            assert!(progress.contains(&format!("shuttle: reusing {package} ")));
+        }
+
+        serial.write(
+            "app/src/Main.co",
+            "static func Main() { int32[] values = int32[:true]; }\n",
+        );
+        let failed = run(serial
+            .shuttle("check", &selected)
+            .args(["--target", target]));
+        expect_status(&failed, 1);
+        assert!(
+            String::from_utf8_lossy(&failed.stderr)
+                .contains("array length has type 'bool'; expected 'int32'")
+        );
+        assert_eq!(current, serial.artifact_bytes(&directory));
+    }
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST"]
 fn checked_updates_have_deterministic_cross_target_artifacts() {
     let selected = compiler();
     for target in ["x86_64", "wasm32"] {

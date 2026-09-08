@@ -47,8 +47,49 @@ Stage 40 coordination is complete following the compiler's 40.4 exit audit on
 2026-09-07.
 Stage 41 coordination is complete following the compiler's separately
 authorized 41.4 exit audit on 2026-09-07.
+Stage 42 coordination is complete following the compiler's separately
+authorized 42.4 exit audit on 2026-09-08.
 
 ## Scheduled work
+
+### Stage 42: Runtime-sized fixed-array coordination
+
+- [x] Record opaque source/default/layout ownership, planned unchanged
+  artifact/compiler/runtime 7/6/9 compatibility, exact v0.3.0 standard-library
+  pairing, unchanged protocol/schemas, bootstrap verification, and non-goals.
+
+  Completed with compiler 42.1 on 2026-09-07. This documentation-only
+  checkpoint changes no production Shuttle code or compatibility. Shuttle
+  does not interpret `T[:length]`, element defaults, allocation failures, or
+  token-buffer contents.
+- [x] During 42.2, preserve existing compiler coordination while runtime-sized
+  construction remains internal verified IR and is not a separately releasable
+  native feature.
+
+  Completed with compiler 42.2 on 2026-09-08. Shuttle production code and
+  schemas remain unchanged. Compiler protocol-v2 interface and object compile
+  operations reject runtime-sized construction before artifact staging or
+  publication, including x86-64 and wasm32 interface requests.
+- [x] During 42.3, verify both targets, whole/separate/source-free and native
+  projects, exact reuse, affected invalidation, failure preservation,
+  deterministic publication, and the `F:\Cloth` token-buffer smoke path under
+  the approved unchanged compatibility boundary.
+
+  Completed with compiler 42.3 on 2026-09-08. Dedicated runtime-array fixtures
+  pass serial/parallel x86-64 and wasm32 checks, deterministic artifacts, exact
+  reuse, affected invalidation, failed-build preservation, whole-project,
+  separate-package, source-free, and native execution. The real bootstrap
+  project passes Shuttle checks on both targets and runs natively.
+- [x] Complete the coordinated 42.4 development, sanitizer, native,
+  cross-target, bootstrap, Rust/MSRV, editor, documentation, formatting, and
+  repository gates.
+
+  Completed 2026-09-08. Distinct-root serial and parallel builds produce
+  byte-identical x86-64/wasm32 artifacts and native executables. Whole,
+  separate, and source-free execution, exact reuse, affected invalidation,
+  failed-output preservation, both compiler configurations, and the real
+  bootstrap project pass. All 51 ordinary Rust tests, Rust 1.85, Clippy, and
+  formatting pass without changing Shuttle production code or schemas.
 
 ### Stage 41: Uniform-nullability coordination
 

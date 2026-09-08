@@ -65,6 +65,57 @@ Stage 40 coordination is complete following the compiler's 40.4 exit audit on
 Stage 41 coordination is complete following the compiler's 41.4 exit audit on
 2026-09-07.
 
+Stage 42 coordination is complete following the compiler's 42.4 exit audit on
+2026-09-08.
+
+## Stage 42: Runtime-sized fixed-array coordination
+
+Status: **complete — coordinated 42.4 exit audit passed 2026-09-08**
+
+The compiler's [Stage 42 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_42_runtime_sized_arrays.md)
+adds `T[:length]` construction for existing fixed arrays and selects the first
+real bootstrap-compiler token-buffer consumer. Shuttle remains opaque to
+source syntax, length evaluation, default values, and element layouts.
+
+Objective: carry the compiler's runtime-sized array implementation through
+exact compiler identity, package selection, reuse, invalidation, linking, and
+deterministic bootstrap builds without adding source-language or collection
+policy to Shuttle.
+
+Deliverables:
+
+1. **42.1 — Contract (complete).** Record opaque ownership, planned unchanged
+   compatibility and schemas, exact pairing, bootstrap verification, and
+   non-goals.
+2. **42.2 — Frontend coordination (complete).** Preserve current production
+   behavior while construction remains internal verified compiler IR; compiler
+   interface and object operations explicitly reject publication until 42.3.
+3. **42.3 — Toolchain and bootstrap integration (complete).** Verify whole,
+   separate, source-free, native, and both-target projects plus exact reuse,
+   affected invalidation, failure preservation, deterministic publication,
+   and the `F:\Cloth` token-buffer smoke path.
+4. **42.4 — Exit audit (complete).** Close compatibility, determinism,
+   failure-preservation, bootstrap, Rust/MSRV, documentation, formatting,
+   sanitizer, and repository gates.
+
+Compatibility remains artifact/compiler/runtime 7/6/9,
+process/receipt/manifest/toolchain schemas remain 2/1/1/1, and `cloth` remains
+v0.3.0. Stage 42 adds no Shuttle protocol, manifest key, source parser,
+collection model, dependency feature, or public registry behavior. Any
+future boundary change requires an amended compiler contract.
+
+Checkpoint 42.3 carries runtime-sized construction through deterministic
+x86-64/wasm32 package builds, exact reuse, affected invalidation, failure
+preservation, whole/separate/source-free native execution, and the real
+`F:\Cloth` token-buffer smoke path. Shuttle production code and schemas remain
+unchanged.
+
+The coordinated 42.4 audit passes both compiler configurations, both targets,
+distinct build roots and schedules, byte-identical artifacts and native
+executables, source-free execution, exact reuse, affected invalidation, failure
+preservation, and the real bootstrap project. Shuttle production code and
+compatibility remain unchanged.
+
 ## Stage 41: Uniform-nullability coordination
 
 Status: **complete — coordinated 41.4 exit audit passed 2026-09-07**

@@ -18,6 +18,7 @@ pub const CHECKED_UPDATES_OUTPUT: &[u8] = b"7\n22\n1\n21\n42\n";
 pub const INTEGER_CONVERSIONS_OUTPUT: &[u8] = b"4464\n65535\n0\n44\n255\n";
 pub const NULLABLE_VALUES_OUTPUT: &[u8] =
     b"true\n41\n42\nkept\ndata-models.Status.Ready\n12\ntrue\n";
+pub const RUNTIME_SIZED_ARRAY_OUTPUT: &[u8] = b"2\ntrue\n41\nkept\n";
 pub const NUMERIC_NOTATION_OUTPUT: &[u8] = b"240\n42\n18446744073709551615\n125\n44\n0\n8\n";
 pub const TYPED_LITERALS_OUTPUT: &[u8] = b"7\n42\n18446744073709551615\n0.5\n44\n0\n8\n";
 pub const TYPED_ERRORS_OUTPUT: &[u8] = b"7\n";
@@ -110,6 +111,37 @@ static func Main() {
   println(wide!);
   Payload? absent = Maybe.Echo(null);
   println(absent == null);
+}
+"#,
+        );
+        fixture
+    }
+
+    pub fn runtime_sized_arrays() -> Self {
+        let fixture = Self::new();
+        fixture.write(
+            "models/src/Payload.co",
+            r"
+struct {
+  string Text;
+  int32 Count;
+  Payload(string text, int32 count) { Text = text; Count = count; }
+}
+",
+        );
+        fixture.write(
+            "app/src/Main.co",
+            r#"
+import models::Payload;
+import tools::Helper;
+static func Main() {
+  int32 count = Helper.Value() - 18;
+  Payload?[] values = Payload?[:count];
+  println(values::length);
+  println(values[0] == null);
+  values[1] = Payload("kept", 41);
+  println(values[1]?.Count ?? -1);
+  println(values[1]?.Text ?? "missing");
 }
 "#,
         );

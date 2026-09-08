@@ -228,6 +228,71 @@ fn nullable_values_cross_whole_separate_and_source_free_packages() {
 
 #[test]
 #[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn runtime_sized_arrays_cross_whole_separate_and_source_free_packages() {
+    let serial = Fixture::runtime_sized_arrays();
+    let parallel = Fixture::runtime_sized_arrays();
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, support::RUNTIME_SIZED_ARRAY_OUTPUT);
+    assert_eq!(second.stdout, first.stdout);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+
+    let executable_relative = format!("app/target/x86_64/app{}", std::env::consts::EXE_SUFFIX);
+    let executable = serial.root.join(&executable_relative);
+    let parallel_executable = parallel.root.join(&executable_relative);
+    let executable_bytes = fs::read(&executable).expect("runtime-array executable");
+    assert_eq!(
+        executable_bytes,
+        fs::read(&parallel_executable).expect("relocated runtime-array executable")
+    );
+
+    let artifacts = serial.artifact_bytes("app/target/x86_64/packages");
+    let main_path = serial.root.join("app/src/Main.co");
+    let valid_main = fs::read_to_string(&main_path).expect("runtime-array source");
+    serial.write(
+        "app/src/Main.co",
+        "static func Main() { int32[] values = int32[:true]; }\n",
+    );
+    let failed = run(&mut serial.shuttle("run", &selected));
+    expect_status(&failed, 1);
+    assert!(
+        String::from_utf8_lossy(&failed.stderr)
+            .contains("array length has type 'bool'; expected 'int32'")
+    );
+    assert_eq!(
+        artifacts,
+        serial.artifact_bytes("app/target/x86_64/packages")
+    );
+    assert_eq!(
+        executable_bytes,
+        fs::read(&executable).expect("preserved runtime-array executable")
+    );
+    let preserved = run(&mut Command::new(&executable));
+    expect_status(&preserved, 0);
+    assert_eq!(preserved.stdout, support::RUNTIME_SIZED_ARRAY_OUTPUT);
+    assert!(preserved.stderr.is_empty());
+    serial.write("app/src/Main.co", &valid_main);
+
+    let whole = whole_project_run(&serial);
+    expect_status(&whole, 0);
+    assert_eq!(whole.stdout, support::RUNTIME_SIZED_ARRAY_OUTPUT);
+    assert!(whole.stderr.is_empty());
+    let source_free = source_free_run(&serial);
+    expect_status(&source_free, 0);
+    assert_eq!(source_free.stdout, support::RUNTIME_SIZED_ARRAY_OUTPUT);
+    assert!(source_free.stderr.is_empty());
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
 fn structs_preserve_relocated_serial_parallel_artifacts() {
     let serial = Fixture::structs();
     let parallel = Fixture::structs();
