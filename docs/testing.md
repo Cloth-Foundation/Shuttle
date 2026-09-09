@@ -1,5 +1,36 @@
 # Shuttle verification
 
+## Stage 45.5d Object-model exit audit
+
+Completed with compiler 45.5d on Windows on 2026-09-09. The compiler-backed
+toolchain and native suites each contain 38 cases. The permanent value-box
+native case covers exact casts and type tests, overload preference, one-time
+left-to-right evaluation, nullable lifting, heterogeneous object arrays, and
+primitive, enum, and struct equality-compatible hashes. It compares serial and
+parallel artifacts and executables, verifies all five expected warm reuses, and
+links successfully after project and standard-library source removal.
+
+All 51 ordinary Rust tests pass together with formatting, warning-denied
+Clippy, and Rust 1.85 compatibility. The complete development and Clang
+ASan/UBSan compiler matrices each pass 355 CTests, including both Shuttle
+suites and the real self-hosted lexer parity test. No Shuttle protocol,
+manifest, receipt, cache, or schema surface changed. Compatibility remains
+artifact/compiler/runtime 8/7/11, schemas 2/1/1/1, and `cloth` v0.5.0.
+
+## Stage 45.5c Object compatibility coordination
+
+Completed with compiler 45.5c on Windows on 2026-09-09. Shuttle advertises and
+requires artifact/compiler/runtime 8/7/11, selects the exact compiler-paired
+`cloth` v0.5.0 distribution, and retains process, receipt, manifest, and
+toolchain schemas 2/1/1/1. Compiler stubs reject the prior artifact version and
+the complete standard-library graph checks on x86-64 and wasm32.
+
+All 51 ordinary Rust tests pass, Clippy is warning-free, and the compiler-backed
+Shuttle entries pass inside the 354-test CTest matrix. Object payload metadata
+remains compiler-owned; Shuttle adds no manifest field, source interpretation,
+or process-protocol surface. Sanitizer and final repository gates remain the
+separately authorized 45.5d exit audit.
+
 ## Stage 44.3 self-hosted literal coordination
 
 Completed with compiler 44.3 on Windows on 2026-09-08. Shuttle checks the real

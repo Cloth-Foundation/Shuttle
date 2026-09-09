@@ -51,10 +51,31 @@ Stage 42 coordination is complete following the compiler's separately
 authorized 42.4 exit audit on 2026-09-08.
 Stage 43 coordination is complete following the compiler's 43.4 exit audit on
 2026-09-08.
-Stage 44 coordination is active. The compiler's 44.3 literal completion is
-complete; the 44.4 exit audit remains separately authorized.
+Stage 44 coordination is complete following the compiler's 44.4 exit audit on
+2026-09-08. Stage 45.5 coordination is complete following its shared 45.5d exit
+audit on 2026-09-09.
 
 ## Scheduled work
+
+### Stage 45.5: Universal Object coordination
+
+- [x] Preserve exact compiler/library selection through the Object contract and
+  root-dispatch checkpoints without interpreting compiler-owned object metadata.
+- [x] During 45.5c, advance compatibility to artifact/compiler/runtime 8/7/11,
+  select the exact `cloth` v0.5.0 distribution, invalidate stale packages, and
+  retain schemas 2/1/1/1.
+
+  Completed 2026-09-09. Capability checks, compiler stubs, both-target standard-
+  library checks, source-free package tests, and stale-version rejection use the
+  coordinated versions. No Shuttle manifest or process-protocol field changed.
+- [x] During 45.5d, close exact reuse and invalidation, native and sanitizer
+  execution, determinism, documentation, formatting, and repository gates.
+
+  Completed 2026-09-09. The 38-case native suite permanently covers value-box
+  execution, evaluation order, equality/hash, source-free linking,
+  serial/parallel artifacts, and warm reuse with both development and sanitized
+  compilers. All ordinary Rust, compiler-backed, formatting, lint, MSRV,
+  documentation, and repository gates pass without a schema expansion.
 
 ### Stage 44: Self-hosted lexer coordination
 
