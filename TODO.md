@@ -49,8 +49,80 @@ Stage 41 coordination is complete following the compiler's separately
 authorized 41.4 exit audit on 2026-09-07.
 Stage 42 coordination is complete following the compiler's separately
 authorized 42.4 exit audit on 2026-09-08.
+Stage 43 coordination is complete following the compiler's 43.4 exit audit on
+2026-09-08.
+Stage 44 coordination is active. The compiler's 44.3 literal completion is
+complete; the 44.4 exit audit remains separately authorized.
 
 ## Scheduled work
+
+### Stage 44: Self-hosted lexer coordination
+
+- [x] Record that Shuttle is opaque to source bytes, tokens, diagnostics,
+  scanners, and parity records; preserve exact compiler/library selection,
+  unchanged compatibility and schemas, deterministic bootstrap builds, and
+  the existing failure-preservation boundary.
+
+  Completed with compiler 44.1 on 2026-09-08. This documentation-only
+  checkpoint changes no Shuttle source, protocol, schema, cache input, or
+  behavior. Compatibility remains 7/6/10 and 2/1/1/1 with `cloth` v0.4.0.
+- [x] During 44.2, verify source/scanner foundation checks on x86-64 and wasm32,
+  native execution, exact warm reuse, affected invalidation, and completed
+  output preservation without a Shuttle production change.
+
+  Completed 2026-09-08. Both targets accept the complete bootstrap source
+  graph, development and sanitizer native executions pass the lexer foundation
+  corpus, and exact package selection remains unchanged. No Shuttle source,
+  protocol, schema, or cache semantics changed.
+- [x] During 44.3, verify complete lexer and malformed-input bootstrap paths
+  while keeping token and diagnostic meaning compiler-owned.
+
+  Completed 2026-09-08. Both targets accept the complete literal scanner graph;
+  development and sanitizer native runs pass the valid, malformed,
+  unterminated, invalid-UTF-8, exact-buffer, and tracked-source corpus. A warm
+  run reuses the exact `cloth` v0.4.0 and `clothc` package artifacts. No Shuttle
+  production source, protocol, schema, manifest, receipt, or cache meaning
+  changed.
+- [ ] Complete the coordinated 44.4 determinism, bootstrap, native,
+  sanitizer, Rust/MSRV, formatting, documentation, and repository gates.
+
+### Stage 43: Portable file-byte coordination
+
+- [x] Record that Shuttle is opaque to application file paths, bytes, runtime
+  statuses, and bootstrap source meaning; preserve the inherited child working
+  directory; and freeze current and planned compatibility and exact library
+  pairing.
+
+  Completed with compiler 43.1 on 2026-09-08. At that documentation-only
+  checkpoint, compatibility remained 7/6/9 and 2/1/1/1 with `cloth` v0.3.0;
+  runtime ABI 10 and `cloth` v0.4.0 were reserved for 43.2.
+- [x] During 43.2, verify the compiler/runtime/library transition, both-target
+  artifacts, exact dependency invalidation and reuse, input-independent cache
+  behavior, and failure preservation without adding Shuttle production code.
+
+  Completed with compiler 43.2 on 2026-09-08. The 7/6/10 compiler/runtime
+  transition, exact `cloth` v0.4.0 pairing, both-target artifacts, warm reuse,
+  runtime-input independence, and failure preservation pass without a Shuttle
+  production or schema change.
+- [x] During 43.3, verify the real bootstrap source-file consumer through
+  direct and Shuttle x86-64/wasm32 builds, native and source-free execution,
+  warm reuse, affected invalidation, deterministic artifacts, and failed-build
+  preservation.
+
+  Completed with compiler 43.3 on 2026-09-08. The real `F:\Cloth` project
+  checks on both targets, runs natively with development and sanitizer
+  compilers, links from source-free artifacts, reuses exact warm outputs, and
+  preserves completed artifacts and the runnable executable after an invalid
+  bootstrap edit. Shuttle production code and schemas remain unchanged.
+- [x] Complete the coordinated 43.4 development, sanitizer, native,
+  cross-platform, bootstrap, Rust/MSRV, editor, documentation, formatting, and
+  repository gates.
+
+  Completed 2026-09-08. Both 354-test compiler configurations, all 38 ignored
+  toolchain and 37 ignored native cases, 51 ordinary Rust tests, Rust 1.85,
+  Clippy, formatting, input-independent caching, deterministic packages,
+  source-free/relocated builds, and the real bootstrap project pass. Shuttle
+  production code and schemas remain unchanged.
 
 ### Stage 42: Runtime-sized fixed-array coordination
 

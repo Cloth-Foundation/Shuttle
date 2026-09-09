@@ -1,5 +1,127 @@
 # Shuttle verification
 
+## Stage 44.3 self-hosted literal coordination
+
+Completed with compiler 44.3 on Windows on 2026-09-08. Shuttle checks the real
+`F:\Cloth` source graph on x86-64 and wasm32. Development and ASan/UBSan native
+runs execute valid and malformed numeric, text, Unicode, UTF-8, termination,
+recovery, exact-buffer, and tracked-source cases and print
+`lexer literals ok`.
+
+A warm development run reuses the exact `cloth` v0.4.0 and `clothc` package
+artifacts and reproduces the output. The complete 354-test development compiler
+matrix passes, including existing affected-invalidation and completed-output
+preservation paths. Shuttle remains opaque to source bytes, token kinds,
+diagnostic categories, scan passes, and test expectations.
+
+No Shuttle production code, process protocol, receipt, manifest, toolchain
+schema, or cache meaning changed. Compatibility remains
+artifact/compiler/runtime 7/6/10 and schemas 2/1/1/1. Differential lexer parity
+and the exit audit remain separately authorized compiler 44.4 work.
+
+## Stage 44.2 self-hosted scanner-foundation coordination
+
+Completed with compiler 44.2 on Windows on 2026-09-08. Shuttle checks the real
+`F:\Cloth` source graph on x86-64 and wasm32. Development and ASan/UBSan native
+runs execute the empty, canonical-token, comment, recovery, exact-buffer, and
+source-coordinate corpus and print `lexer foundation ok`.
+
+A warm development run reuses the exact `cloth` v0.4.0 and `clothc` package
+artifacts and reproduces the output. The complete 354-test development compiler
+matrix passes, including existing affected-invalidation and completed-output
+preservation paths. Shuttle remains opaque to source bytes, token kinds,
+diagnostic categories, scan passes, and test expectations.
+
+No Shuttle production code, process protocol, receipt, manifest, toolchain
+schema, or cache meaning changed. Compatibility remains
+artifact/compiler/runtime 7/6/10 and schemas 2/1/1/1. At this checkpoint,
+literal completion remained separately authorized compiler 44.3 work.
+
+## Stage 44.1 self-hosted lexer coordination contract
+
+Approved with compiler 44.1 on Windows on 2026-09-08. Shuttle remains opaque
+to the bootstrap's source bytes, tokens, diagnostics, scanners, and canonical
+parity records. The new contract retains exact compiler and `cloth` v0.4.0
+selection, ordinary source hashing, deterministic project builds, and completed
+output preservation without adding a manifest key, process field, cache input,
+or production code.
+
+This checkpoint changes coordinated roadmap, ledger, proposal, and bootstrap
+maintainer documentation only. Compatibility remains artifact/compiler/runtime
+7/6/10 and schemas 2/1/1/1. Scanner builds and execution remain separately
+authorized 44.2 work.
+
+The formatted bootstrap source passes `shuttle check` and native `shuttle run`.
+The current LF source reports `962`, `105`, `10`, `2`, `src/Main.co`, and
+`true`; the warm run reuses both `cloth` and `clothc` package artifacts and
+reproduces the output. No Shuttle production code changed.
+
+## Stage 43.4 portable file-byte exit coordination
+
+Completed with compiler 43.4 on Windows on 2026-09-08. Development and
+ASan/UBSan compiler configurations each pass all 354 CTests, including all 38
+compiler-backed and 37 native Shuttle cases. The file-byte fixture confirms
+that application paths and contents remain runtime-only inputs: warm reuse,
+affected invalidation, failed-output preservation, source-free linking,
+relocation, serial/parallel determinism, and both targets remain unchanged.
+
+The real `F:\Cloth` bootstrap checks on x86-64 and wasm32 and runs its
+file-backed source/token-buffer path with both compilers. Warm builds reuse the
+exact `cloth` v0.4.0 and `clothc` artifacts. All 51 ordinary Rust tests, Rust
+1.85 and all-target checks, warning-denied Clippy, Rust/C++ formatting,
+TypeScript and editor tests, documentation links, and repository gates pass.
+All 367 local Markdown targets across 118 files are valid. Compatibility
+remains 7/6/10 and 2/1/1/1. Shuttle production code and schemas are unchanged,
+and Stage 43 coordination is complete.
+
+## Stage 43.3 bootstrap source integration
+
+Completed with compiler 43.3 on Windows on 2026-09-08. The real `F:\Cloth`
+project checks through Shuttle on x86-64 and wasm32 and runs its file-backed
+`SourceFile` and length-sized token buffer natively with development and
+ASan/UBSan compilers. The LF checkpoint records 992 source bytes, first and
+final bytes 105 and 10, two tokens, `src/Main.co`, and a successful EOF check;
+the reported length follows the checkout's exact bytes.
+
+Warm x86-64 builds reuse the exact `cloth` v0.4.0 and `clothc` artifacts.
+Direct protocol-v2 compilation and linking confirm source-free execution. An
+isolated invalid source edit recompiles only `clothc`, produces its stable
+source diagnostic, does not launch the stale executable, and preserves both
+package artifacts and the executable. Shuttle remains opaque to paths and file
+contents and adds no production or schema change. Compatibility remains
+7/6/10 and 2/1/1/1.
+
+## Stage 43.2 portable file-foundation coordination
+
+Completed with compiler 43.2 on Windows on 2026-09-08. Shuttle selects the
+exact compiler-paired `cloth` v0.4.0 distribution and carries runtime ABI 10
+requirements through both targets without a production, process, receipt,
+manifest, or toolchain-schema change. The new native fixture proves that file
+contents are runtime inputs: changing them reuses all build outputs while the
+program observes the new bytes, and removing the file reports the stable
+`IoError` without replacing artifacts or the executable.
+
+All 51 ordinary Rust tests pass, along with 38 compiler-backed and 37 native
+integration tests in both development and ASan/UBSan compiler matrices. Rust
+1.85 checking, all-target checking, warning-denied Clippy, and Rust formatting
+also pass. Active artifact/compiler/runtime compatibility is 7/6/10, schemas
+remain 2/1/1/1, and `cloth` is v0.4.0. Bootstrap coordination remains planned
+43.3 work.
+
+## Stage 43.1 portable file-byte coordination contract
+
+Approved and recorded with compiler 43.1 on Windows on 2026-09-08. This
+documentation-only checkpoint leaves Shuttle production code, protocol,
+schemas, manifests, caches, and execution behavior unchanged. Compatibility
+remains 7/6/9 and 2/1/1/1 with the exact compiler-paired `cloth` v0.3.0.
+
+Shuttle remains opaque to `File.ReadBytes`, paths, contents, runtime statuses,
+and bootstrap source representation. `check` and `build` do not perform
+application file reads. A child launched by `run` continues to inherit the
+invocation working directory and host permissions. Runtime ABI 10, `cloth`
+v0.4.0, file-backed fixtures, and bootstrap integration require separate 43.2
+and 43.3 authorization.
+
 ## Stage 42.4 runtime-sized array exit coordination
 
 Completed with compiler 42.4 on Windows on 2026-09-08. Development and

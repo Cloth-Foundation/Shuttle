@@ -27,7 +27,7 @@ It accepts no other argument and returns one UTF-8 JSON object plus LF, empty
 stderr, and status 0:
 
 ```json
-{"schema":1,"protocols":[1,2],"artifact_formats":[7],"compiler_id":"<64 lowercase hex digits>","standard_library":{"package":"cloth","version":"0.3.0"},"operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
+{"schema":1,"protocols":[1,2],"artifact_formats":[7],"compiler_id":"<64 lowercase hex digits>","standard_library":{"package":"cloth","version":"0.4.0"},"operations":["compile","inspect","link","reuse"],"interface_targets":["x86_64","wasm32"],"object_targets":["x86_64"]}
 ```
 
 The digest placeholder represents the artifact contract's actual compiler

@@ -62,6 +62,74 @@ fn whole_project_run_with_arguments(fixture: &Fixture, program_arguments: &[OsSt
     run(Command::new(output).args(program_arguments))
 }
 
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn file_bytes_are_runtime_inputs_and_preserve_build_outputs() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "app/src/Main.co",
+        r#"
+import cloth.io::File;
+static func Main() throws IoError {
+  byte[] contents = File.ReadBytes("input.bin");
+  println(contents::length);
+  for (var value in contents) {
+    println(value);
+  }
+}
+"#,
+    );
+    let input = fixture.root.join("input.bin");
+    fs::write(&input, [0, 255, 10]).expect("write first file input");
+    let selected = compiler();
+
+    let first = run(&mut fixture.shuttle("run", &selected));
+    expect_status(&first, 0);
+    assert_eq!(first.stdout, b"3\n0\n255\n10\n");
+    assert!(first.stderr.is_empty());
+    let artifacts = fixture.artifact_bytes("app/target/x86_64/packages");
+    let executable = fixture.root.join(format!(
+        "app/target/x86_64/app{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    let executable_bytes = fs::read(&executable).expect("file application executable");
+
+    fs::write(&input, [1, 2]).expect("replace file input");
+    let second = run(&mut fixture.visible_shuttle("run", &selected));
+    expect_status(&second, 0);
+    assert_eq!(second.stdout, b"2\n1\n2\n");
+    let progress = String::from_utf8(second.stderr).expect("file reuse progress");
+    assert_eq!(progress.matches("shuttle: reusing ").count(), 5);
+    assert!(!progress.contains("shuttle: compiling "));
+    assert_eq!(
+        fixture.artifact_bytes("app/target/x86_64/packages"),
+        artifacts
+    );
+    assert_eq!(
+        fs::read(&executable).expect("reused file application executable"),
+        executable_bytes
+    );
+
+    fs::remove_file(&input).expect("remove file input");
+    let failed = run(&mut fixture.shuttle("run", &selected));
+    expect_status(&failed, 1);
+    assert!(failed.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8(failed.stderr)
+            .expect("file failure diagnostic")
+            .replace("\r\n", "\n"),
+        "cloth error: cloth.lang.errors.IoError: could not open file\n"
+    );
+    assert_eq!(
+        fixture.artifact_bytes("app/target/x86_64/packages"),
+        artifacts
+    );
+    assert_eq!(
+        fs::read(&executable).expect("preserved file application executable"),
+        executable_bytes
+    );
+}
+
 #[cfg(unix)]
 fn invalid_unicode_argument() -> OsString {
     use std::os::unix::ffi::OsStringExt;
@@ -1603,7 +1671,7 @@ fn links_and_reuses_the_implicit_standard_library() {
         "import cloth.math::Math;\nstatic func Main() throws DivisionByZero, ParseError { println(Math.Gcd(84, 30)); println(int32::parse(\"38\")); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let graph = resolve_package_graph(&whole.manifest()).expect("whole-project graph");
-    let graph = inject_standard_library(&graph, &selected, "cloth", "0.3.0")
+    let graph = inject_standard_library(&graph, &selected, "cloth", "0.4.0")
         .expect("whole-project standard library");
     let request = build_request(&graph, ProjectCommand::Build, Target::X86_64)
         .expect("whole-project request");

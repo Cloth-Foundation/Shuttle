@@ -68,6 +68,87 @@ Stage 41 coordination is complete following the compiler's 41.4 exit audit on
 Stage 42 coordination is complete following the compiler's 42.4 exit audit on
 2026-09-08.
 
+Stage 43 coordination is complete following the compiler's 43.4 exit audit on
+2026-09-08.
+
+Stage 44 coordination is active. The compiler's 44.3 literal completion is
+complete without a Shuttle production or schema change.
+
+## Stage 44: Self-hosted lexer coordination
+
+Status: **active — 44.3 literal coordination complete 2026-09-08**
+
+The compiler's [Stage 44 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_44_self_hosted_lexer.md)
+implements lexical analysis in the real `F:\Cloth` project. Shuttle remains
+opaque to source bytes, tokens, diagnostics, scanners, and parity records.
+
+Objective: carry the self-hosted lexer through exact compiler/library pairing,
+both targets, native execution, deterministic artifacts, reuse, invalidation,
+and failure preservation without adding source policy or a Shuttle protocol.
+
+Deliverables:
+
+1. **44.1 — Contract coordination (complete).** Record opaque ownership,
+   unchanged compatibility and schemas, exact pairing, bootstrap source-map
+   verification, and non-goals.
+2. **44.2 — Foundation coordination (complete).** Verify scanner-foundation builds and
+   execution on both targets plus exact reuse and affected invalidation.
+3. **44.3 — Literal coordination (complete).** Verify complete lexer execution
+   and malformed-input behavior without interpreting its token or diagnostic
+   data.
+4. **44.4 — Exit audit.** Close deterministic direct/Shuttle parity fixtures,
+   native, sanitizer, Rust/MSRV, formatting, documentation, and repository
+   gates.
+
+Compatibility remains artifact/compiler/runtime 7/6/10, schemas 2/1/1/1, and
+`cloth` v0.4.0. Stage 44 adds no Shuttle option, manifest field, cache input,
+source scanner, token decoder, or test-record protocol.
+
+## Stage 43: Portable file-byte coordination
+
+Status: **complete — coordinated 43.4 exit audit passed 2026-09-08**
+
+The compiler's [Stage 43 contract](https://github.com/Cloth-Foundation/cCloth/blob/master/docs/proposals/stage_43_file_bytes_and_source.md)
+adds a bounded standard-library file read and a bootstrap-owned source
+representation. Shuttle remains opaque to paths, file bytes, runtime statuses,
+and compiler source meaning.
+
+Objective: carry the exact compiler, runtime, and `cloth` library transition
+through package selection, caching, linking, execution, and bootstrap builds
+without reading application-requested files or adding filesystem policy to
+Shuttle.
+
+Deliverables:
+
+1. **43.1 — Contract coordination (complete).** Record opaque ownership,
+   current and planned compatibility, working-directory behavior, exact
+   compiler/library pairing, bootstrap verification, and non-goals.
+2. **43.2 — File-foundation coordination (complete).** Verify runtime ABI 10 and
+   `cloth` v0.4.0 selection, runtime requirements, exact invalidation/reuse,
+   failure preservation, and both-target artifacts without a Shuttle production
+   change.
+3. **43.3 — Bootstrap coordination (complete).** Verify the real `F:\Cloth`
+   source-file path through direct, native, x86-64/wasm32, source-free, warm,
+   and failed-build paths.
+4. **43.4 — Exit audit (complete).** Close compatibility, determinism,
+   input-independent caching, bootstrap, Rust/MSRV, documentation, formatting,
+   sanitizer, and repository gates.
+
+Checkpoint 43.2 advances artifact/compiler/runtime compatibility to 7/6/10 and
+`cloth` to v0.4.0 while retaining schemas 2/1/1/1.
+
+`check` and `build` never open paths passed to `File.ReadBytes`. `run` retains
+the existing inherited process working directory and host permissions; only the
+child executable performs the read. Paths and contents do not enter manifests,
+compiler requests, cache keys, receipts, progress, or artifacts. Stage 43 adds
+no Shuttle option, manifest field, source scanner, sandbox, or file forwarding.
+
+The 43.4 audit passes both 354-test compiler configurations, exact runtime-input
+independence, package reuse and invalidation, source-free and relocated builds,
+the real bootstrap on both targets, all 51 ordinary Rust tests, Rust 1.85,
+Clippy, formatting, editor, documentation, and repository gates without a
+Shuttle production or schema change.
+
 ## Stage 42: Runtime-sized fixed-array coordination
 
 Status: **complete — coordinated 42.4 exit audit passed 2026-09-08**
