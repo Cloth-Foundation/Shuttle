@@ -1108,7 +1108,7 @@ fn injects_the_compiler_paired_standard_library_without_manifest_boilerplate() {
     assert!(receipt.dependencies.iter().any(|dependency| {
         dependency.alias == "cloth"
             && dependency.package.name == "cloth"
-            && dependency.package.version == "0.4.0"
+            && dependency.package.version == "0.5.0"
     }));
 }
 

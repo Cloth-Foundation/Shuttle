@@ -71,8 +71,35 @@ Stage 42 coordination is complete following the compiler's 42.4 exit audit on
 Stage 43 coordination is complete following the compiler's 43.4 exit audit on
 2026-09-08.
 
-Stage 44 coordination is active. The compiler's 44.3 literal completion is
-complete without a Shuttle production or schema change.
+Stage 44 coordination is complete following the compiler's 44.4 exit audit on
+2026-09-08. Stage 45.5 coordination is complete following the shared 45.5d exit
+audit on 2026-09-09.
+
+## Stage 45.5: Universal Object coordination
+
+Status: **complete — coordinated 45.5d exit audit passed 2026-09-09**
+
+The compiler's Stage 45.5 contract introduces the canonical Object root and
+value wrappers. Shuttle remains opaque to box layouts and operations while
+selecting and transporting their exact compiler-paired artifacts.
+
+Objective: carry the Object model through deterministic package selection,
+compatibility checks, cache invalidation, both targets, and source-free builds
+without adding a manifest or process-protocol field.
+
+Deliverables:
+
+1. **45.5a/b — Contract and root coordination (complete).** Preserve exact
+   compiler/library pairing while the compiler establishes root identity and
+   dispatch.
+2. **45.5c — Value-box coordination (complete).** Advertise artifact format 8,
+   compiler ABI 7, and runtime ABI 11; select `cloth` v0.5.0; and reject stale
+   toolchains and package artifacts before compilation.
+3. **45.5d — Exit audit (complete).** Close reuse, invalidation, native, sanitizer,
+   determinism, documentation, and repository gates with the compiler and
+   standard library.
+
+Process, receipt, manifest, and toolchain schemas remain 2/1/1/1.
 
 ## Stage 44: Self-hosted lexer coordination
 

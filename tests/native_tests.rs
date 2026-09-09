@@ -1671,7 +1671,7 @@ fn links_and_reuses_the_implicit_standard_library() {
         "import cloth.math::Math;\nstatic func Main() throws DivisionByZero, ParseError { println(Math.Gcd(84, 30)); println(int32::parse(\"38\")); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let graph = resolve_package_graph(&whole.manifest()).expect("whole-project graph");
-    let graph = inject_standard_library(&graph, &selected, "cloth", "0.4.0")
+    let graph = inject_standard_library(&graph, &selected, "cloth", "0.5.0")
         .expect("whole-project standard library");
     let request = build_request(&graph, ProjectCommand::Build, Target::X86_64)
         .expect("whole-project request");
@@ -1689,6 +1689,134 @@ fn links_and_reuses_the_implicit_standard_library() {
     expect_status(&whole_output, 0);
     assert_eq!(whole_output.stdout, first.stdout);
     assert!(whole_output.stderr.is_empty());
+}
+
+const VALUE_BOX_OUTPUT: &[u8] = b"42\ntrue\ntrue\ntrue\nfalse\n42\nnull\nint32\nobject\n1\n2\n2\napp.Type.SECOND\ntrue\ntrue\napp.Data{Count=7}\ntrue\ntrue\n9\nnull\n1\napp.Type.FIRST\napp.Data{Count=3}\ntrue\nZ\n1.5\n";
+
+fn write_value_box_fixture(fixture: &Fixture) {
+    fixture.write(
+        "app/src/Counter.co",
+        r"
+int32 count = 0;
+Counter() {}
+func Next(): int32 { count++; return count; }
+func Count(): int32 { return count; }
+",
+    );
+    fixture.write(
+        "app/src/Data.co",
+        r"
+struct {
+  final int32 Count;
+  Data(int32 count) { Count = count; }
+}
+",
+    );
+    fixture.write("app/src/Type.co", "enum { FIRST, SECOND }\n");
+    fixture.write(
+        "app/src/Main.co",
+        r#"
+static func Pick(int32 value): string { return "int32"; }
+static func Pick(object value): string { return "object"; }
+static func Pair(object first, object second) {
+  println(first);
+  println(second);
+}
+
+static func Main() {
+  object integer = 42;
+  println(integer);
+  println(integer.Equals(Int32(42)));
+  println(integer.HashCode() == Int32(42).HashCode());
+  println(integer is int32);
+  println(integer is uint32);
+  int32? restored = integer as int32?;
+  uint32? rejected = integer as uint32?;
+  println(restored!);
+  println(rejected);
+  println(Pick(1));
+  println(Pick(integer));
+
+  Counter counter = Counter();
+  Pair(counter.Next(), counter.Next());
+  println(counter.Count());
+
+  object choice = Type.SECOND;
+  object sameChoice = Type.SECOND;
+  println(choice);
+  println(choice.Equals(sameChoice));
+  println(choice.HashCode() == sameChoice.HashCode());
+
+  object data = Data(7);
+  object sameData = Data(7);
+  println(data);
+  println(data.Equals(sameData));
+  println(data.HashCode() == sameData.HashCode());
+
+  int32? present = 9;
+  object? lifted = present;
+  int32? absent = null;
+  object? empty = absent;
+  println(lifted);
+  println(empty);
+
+  object[] values = [1, Type.FIRST, Data(3)];
+  for (object value in values) { println(value); }
+  object truth = true;
+  object letter = 'Z';
+  object decimal = 1.5;
+  println(truth);
+  println(letter);
+  println(decimal);
+}
+"#,
+    );
+}
+
+#[test]
+#[ignore = "requires CLOTHC_UNDER_TEST and a native linker"]
+fn value_boxes_preserve_native_order_identity_and_source_free_behavior() {
+    let serial = Fixture::new();
+    let parallel = Fixture::new();
+    write_value_box_fixture(&serial);
+    write_value_box_fixture(&parallel);
+    parallel.reverse_dependencies();
+    let selected = compiler();
+    let first = run(serial.shuttle("run", &selected).args(["--jobs", "1"]));
+    let second = run(parallel.shuttle("run", &selected).args(["--jobs", "4"]));
+    expect_status(&first, 0);
+    expect_status(&second, 0);
+    assert_eq!(first.stdout, VALUE_BOX_OUTPUT);
+    assert_eq!(second.stdout, VALUE_BOX_OUTPUT);
+    assert!(first.stderr.is_empty() && second.stderr.is_empty());
+    assert_eq!(
+        serial.artifact_bytes("app/target/x86_64/packages"),
+        parallel.artifact_bytes("app/target/x86_64/packages")
+    );
+    let executable = format!("app/target/x86_64/app{}", std::env::consts::EXE_SUFFIX);
+    assert_eq!(
+        fs::read(serial.root.join(&executable)).expect("serial value-box executable"),
+        fs::read(parallel.root.join(&executable)).expect("parallel value-box executable")
+    );
+
+    let warm = run(&mut serial.visible_shuttle("run", &selected));
+    expect_status(&warm, 0);
+    assert_eq!(warm.stdout, VALUE_BOX_OUTPUT);
+    let progress = String::from_utf8(warm.stderr).expect("value-box reuse progress");
+    assert_eq!(progress.matches("shuttle: reusing ").count(), 5);
+    assert!(!progress.contains("shuttle: compiling "));
+
+    let source_free = source_free_run_with_dependencies(
+        &serial,
+        &[
+            ("models", "data-models"),
+            ("tools", "tools"),
+            ("cloth", "cloth"),
+        ],
+    );
+    expect_status(&source_free, 0);
+    assert_eq!(source_free.stdout, VALUE_BOX_OUTPUT);
+    assert!(source_free.stderr.is_empty());
 }
 
 #[test]
