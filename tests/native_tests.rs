@@ -1671,7 +1671,7 @@ fn links_and_reuses_the_implicit_standard_library() {
         "import cloth.math::Math;\nstatic func Main() throws DivisionByZero, ParseError { println(Math.Gcd(84, 30)); println(int32::parse(\"38\")); println(ArgumentError(\"invalid argument\").Message); println(StateError(\"invalid state\").Message); }\n",
     );
     let graph = resolve_package_graph(&whole.manifest()).expect("whole-project graph");
-    let graph = inject_standard_library(&graph, &selected, "cloth", "0.5.0")
+    let graph = inject_standard_library(&graph, &selected, "cloth", "0.6.0")
         .expect("whole-project standard library");
     let request = build_request(&graph, ProjectCommand::Build, Target::X86_64)
         .expect("whole-project request");

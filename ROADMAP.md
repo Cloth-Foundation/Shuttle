@@ -73,7 +73,29 @@ Stage 43 coordination is complete following the compiler's 43.4 exit audit on
 
 Stage 44 coordination is complete following the compiler's 44.4 exit audit on
 2026-09-08. Stage 45.5 coordination is complete following the shared 45.5d exit
-audit on 2026-09-09.
+audit on 2026-09-09. Stage 49.3 standard-error coordination advances the paired
+library to v0.6.0 and runtime ABI 12 without a Shuttle schema change. Stage
+49.4 frontend-authority coordination is complete following the isolated
+relocated x86-64/wasm32 audit on 2026-09-10.
+
+## Stage 49.4: Frontend authority audit coordination
+
+Status: **complete — coordinated 2026-09-10**
+
+Shuttle's declared staging audit passes parallel x86-64 cold and warm builds,
+byte-identical reuse, native execution, wasm32 checking, and failed-output
+preservation for the complete self-hosted graph. The authority transfer changes
+no Shuttle production source, protocol, receipt, manifest, or toolchain schema.
+
+## Stage 49.3: Standard-error compatibility coordination
+
+Status: **complete — coordinated 2026-09-10**
+
+Shuttle selects the exact `cloth` v0.6.0 distribution advertised by the
+compiler descriptor and treats runtime ABI 12 as opaque artifact compatibility.
+Artifact format 8, compiler ABI 7, process protocol 2, receipt schema 1,
+manifest schema 1, and toolchain schema 1 are unchanged. Stale v0.5.0/runtime
+ABI 11 artifacts are rebuilt rather than reinterpreted.
 
 ## Stage 45.5: Universal Object coordination
 
