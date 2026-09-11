@@ -1,5 +1,25 @@
 # Shuttle verification
 
+## Stage 49.4 frontend authority audit coordination
+
+Completed on Windows on 2026-09-10. The Bazel-owned isolated Shuttle target
+passed in 98.0 seconds. Its declared repository staging path contains spaces;
+parallel x86-64 cold and warm builds were byte-identical, native execution and
+wasm32 checking passed, and an invalid rebuild preserved completed outputs.
+
+The same production self-hosted source graph checks on x86-64 and wasm32 with
+the Clang ASan/UBSan bootstrap compiler. All 51 ordinary Shuttle tests,
+formatting, and warning-denied Clippy pass. No Shuttle production source,
+protocol, receipt, manifest, or toolchain schema changed.
+
+## Stage 49.3 standard-error compatibility coordination
+
+Completed on Windows on 2026-09-10. Shuttle and the self-hosted Bazel toolchain
+select compiler-paired `cloth` v0.6.0 while carrying runtime ABI 12 inside
+opaque format-8 artifacts. Compiler ABI 7 and schemas 2/1/1/1 remain unchanged.
+The standard-library and self-hosted driver focused gates pass; the complete
+coordinated audit remains Stage 49.4.
+
 ## Stage 45.5d Object-model exit audit
 
 Completed with compiler 45.5d on Windows on 2026-09-09. The compiler-backed

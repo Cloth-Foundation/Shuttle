@@ -53,9 +53,31 @@ Stage 43 coordination is complete following the compiler's 43.4 exit audit on
 2026-09-08.
 Stage 44 coordination is complete following the compiler's 44.4 exit audit on
 2026-09-08. Stage 45.5 coordination is complete following its shared 45.5d exit
-audit on 2026-09-09.
+audit on 2026-09-09. Stage 49.3 standard-error compatibility coordination is
+complete with `cloth` v0.6.0 and runtime ABI 12. Stage 49.4 frontend-authority
+coordination is complete following the isolated cross-target Shuttle audit.
 
 ## Scheduled work
+
+### Stage 49.4: Frontend authority audit coordination
+
+- [x] Run the declared relocated self-hosted graph through parallel x86-64
+  cold/warm builds, native execution, wasm32 checking, exact reuse, and failed-
+  output preservation without changing Shuttle production contracts.
+
+  Completed 2026-09-10. The uncached Bazel-owned integration target passed in
+  98.0 seconds, and all 51 ordinary Shuttle tests plus formatting and
+  warning-denied Clippy remain green.
+
+### Stage 49.3: Standard-error compatibility coordination
+
+- [x] Select compiler-paired `cloth` v0.6.0, carry runtime ABI 12 opaquely,
+  reject stale paired artifacts, and retain artifact/compiler 8/7 plus schemas
+  2/1/1/1.
+
+  Completed 2026-09-10. The compiler descriptor, capability response, Bazel
+  bootstrap toolchain, standard-library source closure, and Shuttle native
+  compatibility fixtures agree on the new pair.
 
 ### Stage 45.5: Universal Object coordination
 
