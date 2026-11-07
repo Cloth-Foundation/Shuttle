@@ -26,6 +26,11 @@ enum class ShuttleDiagnosticCode(val id: String) {
 	INVALID_ENTRY_POINT("S0011"),
 	OUTPUT_OVERWRITES_MANIFEST("S0012"),
 	INVALID_OUTPUT_SELECTION("S0013"),
+	INVALID_COMMAND("S0014"),
+	RUN_REQUIRES_EXECUTABLE("S0015"),
+	PROGRAM_LAUNCH_FAILED("S0016"),
+	COMMAND_IO("S0017"),
+	INTERNAL_FAILURE("S9000"),
 }
 
 /** One thrown failure, with the original manifest snapshot and optional syntax position. */
@@ -53,6 +58,11 @@ class ShuttleDiagnostic internal constructor(
 }
 
 internal object ShuttleErrors {
+	fun command(reason: String, usage: String, cause: Throwable? = null) = ShuttleDiagnostic(ShuttleDiagnosticCode.INVALID_COMMAND, reason, guidance = usage, cause = cause)
+	fun runRequiresExecutable() = ShuttleDiagnostic(ShuttleDiagnosticCode.RUN_REQUIRES_EXECUTABLE, "The 'run' command requires executable output", guidance = "Omit '--emit object' to build and run the project.")
+	fun runFailed(path: Path, cause: Throwable) = ShuttleDiagnostic(ShuttleDiagnosticCode.PROGRAM_LAUNCH_FAILED, "Unable to run '$path'", guidance = if (cause is InterruptedException) "Execution was interrupted." else cause.message, cause = cause)
+	fun io(cause: Throwable) = ShuttleDiagnostic(ShuttleDiagnosticCode.COMMAND_IO, "Unable to complete Shuttle command", guidance = cause.message, cause = cause)
+	fun internal(cause: Throwable) = ShuttleDiagnostic(ShuttleDiagnosticCode.INTERNAL_FAILURE, "Unexpected Shuttle failure", cause = cause)
 	fun projectNotFound(directory: Path) = ShuttleDiagnostic(ShuttleDiagnosticCode.PROJECT_NOT_FOUND, "No build.toml found in '$directory' or its parent directories")
 	fun selection(path: Path, reason: String, cause: Throwable? = null) = ShuttleDiagnostic(ShuttleDiagnosticCode.INVALID_PROJECT_SELECTION, "Unable to select project '$path': $reason", cause = cause)
 	fun read(path: Path, cause: Throwable) = ShuttleDiagnostic(ShuttleDiagnosticCode.MANIFEST_READ, "Unable to read manifest '$path'", manifestPath = path, cause = cause)

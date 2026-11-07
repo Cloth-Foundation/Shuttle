@@ -1,4 +1,5 @@
 plugins {
+	application
 	kotlin("jvm") version "2.4.20"
 }
 
@@ -40,8 +41,20 @@ kotlin {
 	jvmToolchain(25)
 }
 
+application {
+	mainClass.set("shuttle.EntryKt")
+	applicationName = "shuttle"
+	applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
+}
+
+tasks.named<JavaExec>("run") {
+	workingDir(rootProject.projectDir)
+	standardInput = System.`in`
+}
+
 tasks.test {
 	workingDir(rootProject.projectDir)
 	useJUnitPlatform()
 	jvmArgs("--enable-native-access=ALL-UNNAMED")
+	systemProperty("shuttle.test.runtimeClasspath", sourceSets.test.get().runtimeClasspath.asPath)
 }
