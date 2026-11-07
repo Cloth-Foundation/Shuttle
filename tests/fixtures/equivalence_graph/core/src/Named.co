@@ -1,3 +1,0 @@
-interface {
-  func Name(): string;
-}

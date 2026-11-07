@@ -1,3 +1,0 @@
-interface : Named {
-  func Score(): int32;
-}

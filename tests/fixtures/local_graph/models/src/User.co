@@ -1,4 +1,0 @@
-import foundation.data::Record;
-
-static func Value(): int32 { return Record.Value(); }
-static func hidden(): int32 { return 99; }
