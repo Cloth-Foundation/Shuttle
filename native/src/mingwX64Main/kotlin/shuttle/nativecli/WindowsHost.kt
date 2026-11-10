@@ -48,7 +48,7 @@ private fun fileAttributes(path: String): UInt = memScoped {
 	val attributes = GetFileAttributesW(path.wcstr.ptr)
 	if (attributes == UInt.MAX_VALUE) {
 		val error = GetLastError().toInt()
-		if (error != ERROR_FILE_NOT_FOUND.toInt() && error != ERROR_PATH_NOT_FOUND.toInt()) {
+		if (error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND) {
 			throw HostFailure("Unable to inspect '$path' (Windows error $error)")
 		}
 	}
