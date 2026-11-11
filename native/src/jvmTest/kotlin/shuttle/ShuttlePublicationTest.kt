@@ -28,12 +28,14 @@ class ShuttlePublicationTest {
 	}
 
 	@Test
-	fun `Bootstrap reads source and prints its token count from the nested module layout`(@TempDir directory: Path) {
+	fun `Bootstrap scans standard input from the nested module layout`(@TempDir directory: Path) {
 		val project = copyProject("Bootstrap", directory.resolve("bootstrap"))
 		val result = shuttleProcess(project.resolve("Frontend/lexer"), listOf("run", "-o", directory.resolve("binary/Cloth").toString()), input = "def answer = 42\n")
 		assertEquals(0, result.status, result.output)
 		val output = result.output.replace("\r\n", "\n")
-		assertTrue(output.endsWith("\n5\n\nPEC: 0\n"), output)
+		assertContains(output, "\"lexeme\": \"answer\"")
+		assertContains(output, "\"lexeme\": \"42\"")
+		assertTrue(output.endsWith("\nPEC: 0\n"), output)
 		assertEquals(1, Regex("PEC: 0").findAll(output).count(), output)
 	}
 
