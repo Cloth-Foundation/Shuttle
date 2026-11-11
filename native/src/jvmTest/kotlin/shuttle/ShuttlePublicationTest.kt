@@ -40,6 +40,18 @@ class ShuttlePublicationTest {
 	}
 
 	@Test
+	fun `Bootstrap scans a relative source path from the caller directory`(@TempDir directory: Path) {
+		val project = copyProject("Bootstrap", directory.resolve("bootstrap"))
+		val caller = project.resolve("Frontend/lexer")
+		val input = Files.writeString(caller.resolve("输入 source.co"), "def answer = 42\n")
+		val result = shuttleProcess(caller, listOf("run", "-o", directory.resolve("binary/Cloth").toString(), "--", input.fileName.toString()))
+		assertEquals(0, result.status, result.output)
+		assertContains(result.output, "\"lexeme\": \"answer\"")
+		assertContains(result.output, "\"lexeme\": \"42\"")
+		assertFalse(result.output.contains("Input your code"), result.output)
+	}
+
+	@Test
 	fun `published TOML project emits a foreign object without linker discovery`(@TempDir directory: Path) {
 		val project = copyProject("examples/Shuttle", directory.resolve("project"))
 		val output = directory.resolve("objects/example.o")
