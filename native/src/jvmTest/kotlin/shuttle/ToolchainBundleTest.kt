@@ -78,7 +78,7 @@ class ToolchainBundleTest {
 	@Test fun `exporter packages the public collections and their pinned snapshot compiles through the public API`() {
 		val (root, library) = fixture()
 		val actual = Path.of("Standard-Library").toAbsolutePath()
-		val collections = listOf("List", "Deque", "Queue", "Stack").map { "cloth/collections/$it.co" }
+		val collections = listOf("List", "OwningList", "Snapshot", "Deque", "Queue", "Stack").map { "cloth/collections/$it.co" }
 		for (relative in listOf("module.toml", "cloth/Library.co") + collections) {
 			Files.copy(actual.resolve(relative), library.resolve(relative), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
 		}
@@ -93,14 +93,22 @@ class ToolchainBundleTest {
 		val app = Files.createDirectory(root.resolve("app"))
 		val source = Files.writeString(app.resolve("Main.co"), """
 		    using cloth.collections.List : List
+		    using cloth.collections.OwningList : OwningList
 		    using cloth.collections.Deque : Deque
 		    using cloth.collections.Queue : Queue
 		    using cloth.collections.Stack : Stack
+		    typedef<class> Item (pub def<int> value)
 		    fn main() {
 		        def values = List<int[]>::new
 		        values.append([1]); values.append([2, 3])
 		        def copied = values.copy()
 		        values::delete; copied::delete
+
+		        def owned = OwningList<Item>::new
+		        owned.append(Item::new(4))
+		        println(owned[0].value)
+		        for (def item <- owned) println(item.value)
+		        owned::delete
 
 		        def ends = Deque<int>::new
 		        ends.pushFront(1); ends.pushBack(2)
